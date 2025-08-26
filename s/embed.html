@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>V4L</title>
+  <style>
+    :root {
+      --blue: #00cfff;
+      --dark: #02050a;
+      --light-blue: rgba(0, 207, 255, 0.2);
+      --font: 'Segoe UI', sans-serif;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at center, #04121c, var(--dark));
+      color: var(--blue);
+      font-family: var(--font);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #particles-js {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      text-align: center;
+      padding: 1rem;
+    }
+
+    h1 {
+      font-size: clamp(20px, 5vw, 36px);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      background: linear-gradient(90deg, #00cfff, #0070ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shine 3s infinite linear;
+    }
+
+    @keyframes shine {
+      0% { background-position: -200px 0; }
+      100% { background-position: 200px 0; }
+    }
+
+    .loading-text {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      color: rgba(0, 207, 255, 0.8);
+      letter-spacing: 0.1em;
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .progress-container {
+      margin-top: 2rem;
+      width: 80%;
+      max-width: 400px;
+      background: var(--light-blue);
+      border-radius: 50px;
+      overflow: hidden;
+      box-shadow: 0 0 15px rgba(0, 207, 255, 0.4);
+    }
+
+    .progress-bar {
+      height: 1rem;
+      width: 0%;
+      background: linear-gradient(90deg, var(--blue), #0070ff);
+      animation: progressAnim 4s linear forwards;
+    }
+
+    @keyframes progressAnim {
+      0% { width: 0%; }
+      100% { width: 100%; }
+    }
+
+    @media (max-width: 500px) {
+      h1 { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="particles-js"></div>
+
+  <div class="container">
+    <h1>[V4L] doing stuff </h1>
+    <div class="loading-text">Loading interface...</div>
+    <div class="progress-container">
+      <div class="progress-bar"></div>
+    </div>
+  </div>
+
+  
+
+  <script src="uv/uv.bundle.js" defer></script>
+  <script src="uv/uv.config.js" defer></script>
+  <script src="register-sw.js" defer></script>
+  <script src="embed.js" defer></script>
+</body>
+</html>

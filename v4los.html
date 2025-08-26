@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V4l OS</title>
+    <!-- Tailwind CSS for utility classes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for 'Mon' (if it's a specific font you're linking, otherwise monospace fallback) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons for fallback/default icons if PNGs are not found -->
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1/dist/phosphor.js"></script>
+
+    <style>
+        /* Base styles for macOS-like look */
+        body {
+            font-family: 'Mon', monospace; /* Applying the requested font, with monospace fallback */
+            background-image: url('bg.png'); /* Default background image */
+            background-size: cover; /* Cover the entire viewport */
+            background-attachment: fixed; /* Keep background fixed when scrolling (if any) */
+            background-position: center center; /* Center the image */
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Hide scrollbars to simulate a desktop environment */
+            display: flex;
+            flex-direction: column;
+            height: 100vh; /* Full viewport height */
+            color: #333; /* Default text color for light mode */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            transition: background-color 0.3s ease; /* Smooth transition for dark mode */
+        }
+
+        /* Dark mode styles */
+        body[data-theme="dark"] {
+            background-color: #1a1a1a; /* Darker background base */
+            color: #e0e0e0; /* Lighter text for dark mode */
+            background-blend-mode: overlay; /* Blend background image with a dark overlay */
+            background-color: rgba(0, 0, 0, 0.4); /* Dark overlay for the image */
+        }
+
+        /* Dock styling (modern taskbar at the bottom) */
+        .dock {
+            background-color: rgba(255, 255, 255, 0.3); /* Slightly transparent white (more translucent) */
+            backdrop-filter: blur(10px); /* Frosted glass effect */
+            border-radius: 12px;
+            padding: 8px 16px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* Align items to the bottom of the dock */
+            gap: 12px;
+            position: fixed;
+            bottom: 15px; /* Position slightly above the bottom edge */
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Soft shadow */
+            z-index: 1000;
+            flex-wrap: wrap; /* Allow dock items to wrap if too many */
+            max-width: 90%; /* Limit dock width */
+            transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+        }
+
+        body[data-theme="dark"] .dock {
+            background-color: rgba(0, 0, 0, 0.2); /* Darker, more transparent for dark mode (more translucent) */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Dock item styling */
+        .dock-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease-out, background-color 0.2s ease-out;
+            text-align: center;
+            flex-shrink: 0; /* Prevent items from shrinking too much */
+            width: 70px; /* Fixed width for dock items */
+            position: relative; /* Needed for absolute positioning of label */
+        }
+
+        .dock-item:hover {
+            transform: translateY(-8px) scale(1.1); /* Pop effect on hover, slightly higher */
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        body[data-theme="dark"] .dock-item:hover {
+            background-color: rgba(255, 255, 255, 0.1); /* Lighter hover for dark mode */
+        }
+
+        .dock-item .dock-icon-img { /* Styles for custom PNG icons */
+            width: 48px;
+            height: 48px;
+            object-fit: contain; /* Use contain for general icons */
+        }
+        .dock-item .phosphor-icon { /* Styles for Phosphor fallback icons */
+            font-size: 28px; /* Larger icon size for Phosphor icons */
+            color: #4A4A4A; /* Dark gray icon color */
+            line-height: 1; /* Adjust line height for icons */
+            transition: color 0.3s ease;
+        }
+        body[data-theme="dark"] .dock-item .phosphor-icon {
+            color: #cccccc; /* Lighter icons for dark mode */
+        }
+
+        /* Dock item label as hover tooltip */
+        .dock-item .label {
+            position: absolute; /* Position relative to .dock-item */
+            bottom: calc(100% + 5px); /* Above the item */
+            left: 50%;
+            transform: translateX(-50%); /* Center horizontally */
+            background-color: rgba(0, 0, 0, 0.8); /* Dark background for readability */
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 11px; /* Smaller for dock tooltip */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 150%; /* Allow wider than the icon itself */
+            pointer-events: none; /* Do not block mouse events */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1001; /* Higher than dock itself */
+        }
+        body[data-theme="dark"] .dock-item .label {
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+
+        .dock-item:hover .label {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-5px); /* Lift slightly on hover */
+        }
+
+
+        /* Status bar (now at bottom-right) */
+        .status-bar {
+            background-color: rgba(255, 255, 255, 0.6); /* Slightly transparent white */
+            backdrop-filter: blur(10px); /* Frosted glass effect */
+            border-radius: 12px; /* Rounded corners */
+            padding: 8px 16px;
+            display: flex;
+            flex-direction: column; /* Stack time and date */
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            bottom: 15px; /* Aligned with dock's bottom margin */
+            right: 15px; /* Position slightly left of the right edge */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Soft shadow */
+            z-index: 1000;
+            font-size: 13px;
+            color: #4A4A4A;
+            transition: background-color 0.3s ease, backdrop-filter 0.3s ease, color 0.3s ease;
+        }
+
+        body[data-theme="dark"] .status-bar {
+            background-color: rgba(0, 0, 0, 0.4);
+            color: #e0e0e0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Modern button style */
+        .modern-button {
+            background-color: #f0f0f0; /* Light gray */
+            color: #333;
+            border: none;
+            border-radius: 8px; /* Already rounded */
+            padding: 10px 18px;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08); /* Soft shadow */
+            transition: background-color 0.2s ease-out, box-shadow 0.2s ease-out, color 0.3s ease;
+        }
+        body[data-theme="dark"] .modern-button {
+            background-color: #333;
+            color: #e0e0e0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .modern-button:hover {
+            background-color: #e0e0e0;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        body[data-theme="dark"] .modern-button:hover {
+            background-color: #444;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        .modern-button:active {
+            background-color: #d0d0d0;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2); /* Inset shadow for pressed effect */
+        }
+        body[data-theme="dark"] .modern-button:active {
+            background-color: #222;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Modern input style */
+        .modern-input {
+            background-color: #FFFFFF;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, background-color 0.3s ease, color 0.3s ease;
+        }
+        body[data-theme="dark"] .modern-input {
+            background-color: #222;
+            border-color: #444;
+            color: #e0e0e0;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .modern-input:focus {
+            border-color: #007aff; /* macOS blue focus color */
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2); /* Soft blue glow on focus */
+        }
+
+        /* Modern window container styles */
+        .os-window {
+            background-color: rgba(255, 255, 255, 0.8); /* Slightly more translucent white */
+            backdrop-filter: blur(15px); /* Stronger blur for windows */
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); /* Deeper, softer shadow */
+            position: absolute;
+            resize: both; /* Enable resizing by dragging corners */
+            overflow: hidden;
+            min-width: 300px;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255, 255, 255, 0.2); /* Very subtle internal border */
+            transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+        body[data-theme="dark"] .os-window {
+            background-color: rgba(20, 20, 20, 0.8); /* Darker, more transparent for dark mode */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Title bar styling */
+        .title-bar {
+            background-color: rgba(255, 255, 255, 0.1); /* Very subtle transparent background */
+            color: #444;
+            font-weight: 600; /* Semibold */
+            padding: 8px 12px;
+            display: flex;
+            justify-content: center; /* Center title */
+            align-items: center;
+            cursor: grab;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05); /* Subtle separator */
+            position: relative; /* For button positioning */
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+        body[data-theme="dark"] .title-bar {
+            background-color: rgba(0, 0, 0, 0.1);
+            color: #e0e0e0;
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .title-bar.dragging {
+            cursor: grabbing;
+        }
+
+        .title-bar-buttons {
+            position: absolute; /* Position buttons absolutely in top-left */
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 8px; /* Larger gap between control buttons */
+        }
+
+        /* macOS-style window control buttons (red, yellow, green) */
+        .title-bar-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%; /* Circular buttons - Already rounded */
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.1s ease-out;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0; /* Hide default text for icons/colors */
+            outline: none; /* Remove outline on click */
+        }
+
+        .title-bar-button.close-button { background-color: #ff5f56; } /* Red */
+        .title-bar-button.minimize-button { background-color: #ffbd2e; } /* Yellow */
+        .title-bar-button.maximize-button { background-color: #27c93f; } /* Green */
+
+        /* Hover states for buttons (show icons) */
+        .title-bar-button:hover {
+            font-size: 10px; /* Show icon size on hover */
+            color: rgba(0, 0, 0, 0.7); /* Dark icon color */
+            font-weight: bold;
+        }
+        body[data-theme="dark"] .title-bar-button:hover {
+            color: rgba(255, 255, 255, 0.8); /* Lighter icon color for dark mode */
+        }
+
+        .title-bar-button.close-button:hover::after { content: '×'; } /* 'x' */
+        .title-bar-button.minimize-button:hover::after { content: '—'; } /* '-' */
+        .title-bar-button.maximize-button:hover::after { content: '⤡'; } /* Expand symbol */
+
+        /* Window content area */
+        .window-content {
+            padding: 15px;
+            flex-grow: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            transition: color 0.3s ease;
+        }
+
+        /* Hidden class for toggling window visibility */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Overrides and adjustments for original content within the OS theme */
+        h1, p {
+            color: #333; /* Darker text */
+            transition: color 0.3s ease;
+        }
+        body[data-theme="dark"] h1, body[data-theme="dark"] p {
+            color: #e0e0e0;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: 600; /* Semibold */
+        }
+        p {
+            font-size: 15px;
+            margin-bottom: 10px;
+        }
+
+        #search-bar {
+            @apply modern-input;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .info-link {
+            @apply modern-button;
+            padding: 10px 20px;
+            font-size: 15px;
+            flex-grow: 1;
+            max-width: 220px;
+        }
+
+        /* Container for game cards within the games window */
+        .game-card-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px; /* More space between cards */
+            justify-content: flex-start;
+            padding: 5px;
+        }
+
+        /* Styling for individual game cards (Launchpad buttons) */
+        .game-card {
+            background-color: rgba(255, 255, 255, 0.8); /* Slightly transparent white */
+            border-radius: 10px;
+            text-decoration: none;
+            text-align: center;
+            padding: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Soft shadow */
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, background-color 0.2s ease-out;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            overflow: hidden; /* Keep overflow hidden for content within card */
+            position: relative;
+            width: 140px; /* Slightly larger cards */
+            height: 160px; /* Fixed height */
+            flex-shrink: 0;
+            border: 1px solid rgba(0, 0, 0, 0.05); /* Very subtle border */
+        }
+        body[data-theme="dark"] .game-card {
+            background-color: rgba(30, 30, 30, 0.8);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+
+        .game-card:hover {
+            transform: translateY(-3px); /* Subtle lift effect */
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+            background-color: rgba(255, 255, 255, 1); /* Fully opaque on hover */
+        }
+        body[data-theme="dark"] .game-card:hover {
+            background-color: rgba(40, 40, 40, 0.9);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+        }
+
+        .game-card img {
+            width: 90px; /* Larger icon size for images */
+            height: 90px;
+            object-fit: cover;
+            border-radius: 8px; /* Square button with rounded corners */
+            margin-bottom: 8px; /* Space between image and title */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Game title - always visible below the picture on Launchpad */
+        .game-card .game-title {
+            color: #333;
+            font-size: 13px;
+            font-weight: 500;
+            word-break: break-word;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap; /* Keep on one line for ellipsis */
+            width: 100%; /* Take full width of parent (game-card padding) */
+            transition: color 0.3s ease;
+            opacity: 1; /* Ensure always visible */
+            visibility: visible; /* Ensure always visible */
+        }
+        body[data-theme="dark"] .game-card .game-title {
+            color: #e0e0e0;
+        }
+
+
+        /* Ensure window elements are not selectable during drag */
+        .title-bar, .title-bar * {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .os-window {
+                width: 90% !important;
+                height: 70% !important;
+                left: 5% !important;
+                top: 5% !important;
+                transform: none !important; /* Remove transform for easier mobile positioning */
+            }
+
+            .dock {
+                width: 90%;
+                bottom: 10px;
+                gap: 8px; /* Reduce gap on smaller screens */
+            }
+
+            .dock-item {
+                width: 60px; /* Smaller width for dock items on mobile */
+            }
+
+            .dock-item .dock-icon-img, .dock-item img.game-icon {
+                width: 40px;
+                height: 40px;
+            }
+
+            /* Adjust dock item label position for smaller dock icons */
+            .dock-item .label {
+                font-size: 10px;
+                bottom: calc(100% + 3px); /* Closer to the smaller icon */
+            }
+
+            .status-bar {
+                top: unset; /* Remove top positioning */
+                bottom: 10px; /* Move to bottom on mobile */
+                right: 10px;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+
+            .game-card {
+                width: 100px;
+                height: 120px;
+            }
+
+            .game-card img {
+                width: 60px;
+                height: 60px;
+            }
+
+            /* Adjust title position for smaller game cards */
+            .game-card .game-title {
+                font-size: 11px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+            p {
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Status bar (now at bottom-right) -->
+    <div class="status-bar" id="statusBar">
+        <span id="currentTime"></span>
+        <span id="currentDate"></span>
+    </div>
+
+    <!-- Dock at the bottom of the screen -->
+    <div class="dock" id="mainDock">
+        <div id="launchpadButton" class="dock-item">
+            <img src="osico/launchpad.png" onerror="handleDockSystemIconError(this)" alt="Launchpad" class="dock-icon-img">
+            <span class="label">Launchpad</span>
+        </div>
+        <!-- New Settings Button -->
+        <div id="settingsButton" class="dock-item">
+            <img src="osico/settings.png" onerror="handleDockSystemIconError(this)" alt="Settings" class="dock-icon-img">
+            <span class="label">Settings</span>
+        </div>
+        <!-- Finder remains, now third -->
+        <div id="finderDockItem" class="dock-item">
+            <img src="osico/finder.png" onerror="handleDockSystemIconError(this)" alt="Finder" class="dock-icon-img">
+            <span class="label">Finder</span>
+        </div>
+        <!-- New V4Ltext and V4LPaint buttons -->
+        <div id="v4lTextButton" class="dock-item" data-app-url="text.html" data-app-title="V4Ltext" data-app-img="osico/v4ltext.png">
+            <img src="osico/v4ltext.png" onerror="handleDockSystemIconError(this)" alt="V4Ltext Icon" class="dock-icon-img">
+            <span class="label">V4Ltext</span>
+        </div>
+        <div id="v4lPaintButton" class="dock-item" data-app-url="paint.html" data-app-title="V4LPaint" data-app-img="osico/v4lpaintd.png">
+            <img src="osico/v4lpaintd.png" onerror="handleDockSystemIconError(this)" alt="V4LPaint Icon" class="dock-icon-img">
+            <span class="label">V4LPaint</span>
+        </div>
+        <!-- Recent games will be dynamically added here -->
+    </div>
+
+    <!-- Main desktop content area (flexible to center initial window) -->
+    <div class="flex-grow flex items-center justify-center p-4">
+        <!-- Welcome Window - initially visible and centered -->
+        <div class="os-window" id="welcomeWindow" style="width: 450px; height: 300px; left: 50%; top: 50%; transform: translate(-50%, -50%);">
+            <div class="title-bar">
+                <div class="title-bar-buttons">
+                    <button class="title-bar-button close-button" onclick="closeWindow('welcomeWindow')"></button>
+                    <button class="title-bar-button minimize-button" onclick="minimizeWindow('welcomeWindow')"></button>
+                    <button class="title-bar-button maximize-button" onclick="maximizeWindow('welcomeWindow')"></button>
+                </div>
+                <span class="title-text">Welcome to V4l!</span>
+            </div>
+            <div class="window-content text-center flex flex-col justify-between items-center h-full">
+                <h1>Welcome to V4l!</h1>
+                <p>Hello! This is a modern take on a classic game portal.</p>
+                <div class="button-container">
+                    <a href="https://forms.gle/vZiTZZ97Qngp52bW8" class="info-link" target="_blank">Submit a game</a>
+                    <a href="https://forms.gle/D76Teo8VL2Kw46kg6" class="info-link" target="_blank">Feedback</a>
+                    <a href="console.html">
+  <button>console</button>
+</a>
+                    <a href="win95.html">
+  <button>98</button>
+</a>
+                    <a href="win.html">
+  <button>Win</button>
+</a>
+    
+    <img src="UBGUMember.png" alt="UBGU" style="width:200px;height:200px;">
+                </div>
+                <p class="text-sm text-gray-600 mt-auto">Most of the games were ported to html by 3hk0</p>
+            </div>
+        </div>
+
+        <!-- Settings Window (initially hidden) -->
+        <div class="os-window hidden" id="settingsWindow" style="width: 500px; height: 350px; left: 50%; top: 50%; transform: translate(-50%, -50%);">
+            <div class="title-bar">
+                <div class="title-bar-buttons">
+                    <button class="title-bar-button close-button" onclick="closeWindow('settingsWindow')"></button>
+                    <button class="title-bar-button minimize-button" onclick="minimizeWindow('settingsWindow')"></button>
+                    <button class="title-bar-button maximize-button" onclick="maximizeWindow('settingsWindow')"></button>
+                </div>
+                <span class="title-text">Settings</span>
+            </div>
+            <div class="window-content flex flex-col gap-4">
+                <h2 class="text-xl font-semibold">Appearance</h2>
+                <div class="flex items-center justify-between p-2 rounded-lg bg-gray-100 dark:bg-gray-800 transition-colors">
+                    <span>Dark Mode:</span>
+                    <button id="darkModeToggle" class="modern-button">Toggle</button>
+                </div>
+
+                <h2 class="text-xl font-semibold mt-4">Background</h2>
+                <div class="flex items-center justify-between p-2 rounded-lg bg-gray-100 dark:bg-gray-800 transition-colors">
+                    <span>Upload Custom Background:</span>
+                    <input type="file" id="bgUploadInput" accept="image/*" class="modern-input">
+                </div>
+                <div class="flex items-center justify-between p-2 rounded-lg bg-gray-100 dark:bg-gray-800 transition-colors">
+                    <span>Reset to Default Background:</span>
+                    <button id="resetBgButton" class="modern-button">Reset</button>
+                </div>
+                
+                <!-- Placeholder for future settings -->
+                <h2 class="text-xl font-semibold mt-4">Other Settings</h2>
+                <p class="text-gray-700 dark:text-gray-400">More settings options will be added here in the future.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Games Window (initially hidden) -->
+    <div class="os-window hidden" id="gamesWindow" style="width: 75%; height: 85%; left: 12.5%; top: 5%;">
+        <div class="title-bar">
+            <div class="title-bar-buttons">
+                <button class="title-bar-button close-button" onclick="closeWindow('gamesWindow')"></button>
+                <button class="title-bar-button minimize-button" onclick="minimizeWindow('gamesWindow')"></button>
+                <button class="title-bar-button maximize-button" onclick="maximizeWindow('gamesWindow')"></button>
+            </div>
+            <span class="title-text">Games</span>
+        </div>
+        <div class="window-content">
+            <input type="text" id="search-bar" class="modern-input" onkeyup="filterGames()" placeholder="Search games..." list="recentGamesList">
+            <datalist id="recentGamesList"></datalist>
+
+            <div class="game-card-container" id="gameCardsContainer">
+                <a href="/projects/1v1space/index.html" class="game-card" data-game-title="1v1space">
+                    <img src="/projects/1v1space/1v1space.jpg" onerror="handleGameImageError(this)" alt="1v1space Thumbnail">
+                    <div class="game-title">1v1space</div>
+                </a>
+                <a href="/projects/2048/index.html" class="game-card" data-game-title="2048">
+                    <img src="/projects/2048/2048.jpg" onerror="handleGameImageError(this)" alt="2048 Thumbnail">
+                    <div class="game-title">2048</div>
+                </a>
+                <a href="/projects/8ball/index.html" class="game-card" data-game-title="8ball">
+                    <img src="/projects/8ball/8ball.jpg" onerror="handleGameImageError(this)" alt="8ball Thumbnail">
+                    <div class="game-title">8ball</div>
+                </a>
+                <a href="/projects/9007199254740992/index.html" class="game-card" data-game-title="9007199254740992">
+                    <img src="/projects/9007199254740992/9007199254740992.jpg" onerror="handleGameImageError(this)" alt="9007199254740992 Thumbnail">
+                    <div class="game-title">9007199254740992</div>
+                </a>
+                <a href="/projects/BTD4/index.html" class="game-card" data-game-title="BTD4">
+                    <img src="/projects/BTD4/BTD4.jpg" onerror="handleGameImageError(this)" alt="BTD4 Thumbnail">
+                    <div class="game-title">BTD4</div>
+                </a>
+                <a href="/projects/Bitlife/index.html" class="game-card" data-game-title="Bitlife">
+                    <img src="/projects/Bitlife/Bitlife.jpg" onerror="handleGameImageError(this)" alt="Bitlife Thumbnail">
+                    <div class="game-title">Bitlife</div>
+                </a>
+                <a href="/projects/Bloxorz/index.html" class="game-card" data-game-title="Bloxorz">
+                    <img src="/projects/Bloxorz/Bloxorz.jpg" onerror="handleGameImageError(this)" alt="Bloxorz Thumbnail">
+                    <div class="game-title">Bloxorz</div>
+                </a>
+                <a href="/projects/Chess/index.html" class="game-card" data-game-title="Chess">
+                    <img src="/projects/Chess/Chess.jpg" onerror="handleGameImageError(this)" alt="Chess Thumbnail">
+                    <div class="game-title">Chess</div>
+                </a>
+                <a href="/projects/DogeMiner/index.html" class="game-card" data-game-title="DogeMiner">
+                    <img src="/projects/DogeMiner/DogeMiner.jpg" onerror="handleGameImageError(this)" alt="DogeMiner Thumbnail">
+                    <div class="game-title">DogeMiner</div>
+                </a>
+                <a href="/projects/Henrystickman/index.html" class="game-card" data-game-title="Henrystickman">
+                    <img src="/projects/Henrystickman/Henrystickman.jpg" onerror="handleGameImageError(this)" alt="Henrystickman Thumbnail">
+                    <div class="game-title">Henrystickman</div>
+                </a>
+                <a href="/projects/HexGL/index.html" class="game-card" data-game-title="HexGL">
+                    <img src="/projects/HexGL/HexGL.jpg" onerror="handleGameImageError(this)" alt="HexGL Thumbnail">
+                    <div class="game-title">HexGL</div>
+                </a>
+                <a href="/projects/L2F2/index.html" class="game-card" data-game-title="L2F2">
+                    <img src="/projects/L2F2/L2F2.jpg" onerror="handleGameImageError(this)" alt="L2F2 Thumbnail">
+                    <div class="game-title">L2F2</div>
+                </a>
+                <a href="/projects/L2F3/index.html" class="game-card" data-game-title="L2F3">
+                    <img src="/projects/L2F3/L2F3.jpg" onerror="handleGameImageError(this)" alt="L2F3 Thumbnail">
+                    <div class="game-title">L2F3</div>
+                </a>
+                <a href="/projects/Minecraft/index.html" class="game-card" data-game-title="Minecraft">
+                    <img src="/projects/Minecraft/Minecraft.jpg" onerror="handleGameImageError(this)" alt="Minecraft Thumbnail">
+                    <div class="game-title">Minecraft</div>
+                </a>
+                <a href="/projects/OT/index.html" class="game-card" data-game-title="OT">
+                    <img src="/projects/OT/OT.jpg" onerror="handleGameImageError(this)" alt="OT Thumbnail">
+                    <div class="game-title">OT</div>
+                </a>
+                <a href="/projects/PE/index.html" class="game-card" data-game-title="PE">
+                    <img src="/projects/PE/PE.jpg" onerror="handleGameImageError(this)" alt="PE Thumbnail">
+                    <div class="game-title">PE</div>
+                </a>
+                <a href="/projects/SandboxelsOLD/index.html" class="game-card" data-game-title="SandboxelsOLD">
+                    <img src="/projects/SandboxelsOLD/SandboxelsOLD.jpg" onerror="handleGameImageError(this)" alt="SandboxelsOLD Thumbnail">
+                    <div class="game-title">SandboxelsOLD</div>
+                </a>
+                <a href="/projects/Subway/index.html" class="game-card" data-game-title="Subway">
+                    <img src="/projects/Subway/Subway.jpg" onerror="handleGameImageError(this)" alt="Subway Thumbnail">
+                    <div class="game-title">Subway</div>
+                </a>
+                <a href="/projects/TIO/index.html" class="game-card" data-game-title="TIO">
+                    <img src="/projects/TIO/TIO.jpg" onerror="handleGameImageError(this)" alt="TIO Thumbnail">
+                    <div class="game-title">TIO</div>
+                </a>
+                <a href="/projects/achievementunlocked/index.html" class="game-card" data-game-title="achievementunlocked">
+                    <img src="/projects/achievementunlocked/achievementunlocked.jpg" onerror="handleGameImageError(this)" alt="achievementunlocked Thumbnail">
+                    <div class="game-title">achievementunlocked</div>
+                </a>
+                <a href="/projects/adrenalinechallenge/index.html" class="game-card" data-game-title="adrenalinechallenge">
+                    <img src="/projects/adrenalinechallenge/adrenalinechallenge.jpg" onerror="handleGameImageError(this)" alt="adrenalinechallenge Thumbnail">
+                    <div class="game-title">adrenalinechallenge</div>
+                </a>
+                <a href="/projects/among-us/index.html" class="game-card" data-game-title="among-us">
+                    <img src="/projects/among-us/among-us.jpg" onerror="handleGameImageError(this)" alt="among-us Thumbnail">
+                    <div class="game-title">among-us</div>
+                </a>
+                <a href="/projects/avalanche/index.html" class="game-card" data-game-title="avalanche">
+                    <img src="/projects/avalanche/avalanche.jpg" onerror="handleGameImageError(this)" alt="avalanche Thumbnail">
+                    <div class="game-title">avalanche</div>
+                </a>
+                <a href="/projects/backrooms/index.html" class="game-card" data-game-title="backrooms">
+                    <img src="/projects/backrooms/backrooms.jpg" onerror="handleGameImageError(this)" alt="backrooms Thumbnail">
+                    <div class="game-title">backrooms</div>
+                </a>
+                <a href="/projects/basketball-stars/index.html" class="game-card" data-game-title="basketball-stars">
+                    <img src="/projects/basketball-stars/basketball-stars.jpg" onerror="handleGameImageError(this)" alt="basketball-stars Thumbnail">
+                    <div class="game-title">basketball-stars</div>
+                </a>
+                <a href="/projects/battleforgondor/index.html" class="game-card" data-game-title="battleforgondor">
+                    <img src="/projects/battleforgondor/battleforgondor.jpg" onerror="handleGameImageError(this)" alt="battleforgondor Thumbnail">
+                    <div class="game-title">battleforgondor</div>
+                </a>
+                <a href="/projects/bigredbutton/index.html" class="game-card" data-game-title="bigredbutton">
+                    <img src="/projects/bigredbutton/bigredbutton.jpg" onerror="handleGameImageError(this)" alt="bigredbutton Thumbnail">
+                    <div class="game-title">bigredbutton</div>
+                </a>
+                <a href="/projects/blackknight/index.html" class="game-card" data-game-title="blackknight">
+                    <img src="/projects/blackknight/blackknight.jpg" onerror="handleGameImageError(this)" alt="blackknight Thumbnail">
+                    <div class="game-title">blackknight</div>
+                </a>
+                <a href="/projects/bloonstd/index.html" class="game-card" data-game-title="bloonstd">
+                    <img src="/projects/bloonstd/bloonstd.jpg" onerror="handleGameImageError(this)" alt="bloonstd Thumbnail">
+                    <div class="game-title">bloonstd</div>
+                </a>
+                <a href="/projects/bloonstd2/index.html" class="game-card" data-game-title="bloonstd2">
+                    <img src="/projects/bloonstd2/bloonstd2.jpg" onerror="handleGameImageError(this)" alt="bloonstd2 Thumbnail">
+                    <div class="game-title">bloonstd2</div>
+                </a>
+                <a href="/projects/bloxors/index.html" class="game-card" data-game-title="bloxors">
+                    <img src="/projects/bloxors/bloxors.jpg" onerror="handleGameImageError(this)" alt="bloxors Thumbnail">
+                    <div class="game-title">bloxors</div>
+                </a>
+                <a href="/projects/boxhead2play/index.html" class="game-card" data-game-title="boxhead2play">
+                    <img src="/projects/boxhead2play/boxhead2play.jpg" onerror="handleGameImageError(this)" alt="boxhead2play Thumbnail">
+                    <div class="game-title">boxhead2play</div>
+                </a>
+                <a href="/projects/breakingthebank/index.html" class="game-card" data-game-title="breakingthebank">
+                    <img src="/projects/breakingthebank/breakingthebank.jpg" onerror="handleGameImageError(this)" alt="breakingthebank Thumbnail">
+                    <div class="game-title">breakingthebank</div>
+                </a>
+                <a href="/projects/btts/index.html" class="game-card" data-game-title="btts">
+                    <img src="/projects/btts/btts.jpg" onerror="handleGameImageError(this)" alt="btts Thumbnail">
+                    <div class="game-title">btts</div>
+                </a>
+                <a href="/projects/cannon-basketball-4/index.html" class="game-card" data-game-title="cannon-basketball-4">
+                    <img src="/projects/cannon-basketball-4/cannon-basketball-4.jpg" onerror="handleGameImageError(this)" alt="cannon-basketball-4 Thumbnail">
+                    <div class="game-title">cannon-basketball-4</div>
+                </a>
+                <a href="/projects/canyondefense/index.html" class="game-card" data-game-title="canyondefense">
+                    <img src="/projects/canyondefense/canyondefense.jpg" onerror="handleGameImageError(this)" alt="canyondefense Thumbnail">
+                    <div class="game-title">canyondefense</div>
+                </a>
+                <a href="/projects/cattle3d/index.html" class="game-card" data-game-title="cattle3d">
+                    <img src="/projects/cattle3d/cattle3d.jpg" onerror="handleGameImageError(this)" alt="cattle3d Thumbnail">
+                    <div class="game-title">cattle3d</div>
+                </a>
+                <a href="/projects/cell-machine/index.html" class="game-card" data-game-title="cell-machine">
+                    <img src="/projects/cell-machine/cell-machine.jpg" onerror="handleGameImageError(this)" alt="cell-machine Thumbnail">
+                    <div class="game-title">cell-machine</div>
+                </a>
+                <a href="/projects/championarcher/index.html" class="game-card" data-game-title="championarcher">
+                    <img src="/projects/championarcher/championarcher.jpg" onerror="handleGameImageError(this)" alt="championarcher Thumbnail">
+                    <div class="game-title">championarcher</div>
+                </a>
+                <a href="/projects/chrome-dino/index.html" class="game-card" data-game-title="chrome-dino">
+                    <img src="/projects/chrome-dino/chrome-dino.jpg" onerror="handleGameImageError(this)" alt="chrome-dino Thumbnail">
+                    <div class="game-title">chrome-dino</div>
+                </a>
+                <a href="/projects/circlo/index.html" class="game-card" data-game-title="circlo">
+                    <img src="/projects/circlo/circlo.jpg" onerror="handleGameImageError(this)" alt="circlo Thumbnail">
+                    <div class="game-title">circlo</div>
+                </a>
+                <a href="/projects/connect3/index.html" class="game-card" data-game-title="connect3">
+                    <img src="/projects/connect3/connect3.jpg" onerror="handleGameImageError(this)" alt="connect3 Thumbnail">
+                    <div class="game-title">connect3</div>
+                </a>
+                <a href="/projects/cookie-clicker/index.html" class="game-card" data-game-title="cookie-clicker">
+                    <img src="/projects/cookie-clicker/cookie-clicker.jpg" onerror="handleGameImageError(this)" alt="cookie-clicker Thumbnail">
+                    <div class="game-title">cookie-clicker</div>
+                </a>
+                <a href="/projects/craftmine/index.html" class="game-card" data-game-title="craftmine">
+                    <img src="/projects/craftmine/craftmine.jpg" onerror="handleGameImageError(this)" alt="craftmine Thumbnail">
+                    <div class="game-title">craftmine</div>
+                </a>
+                <a href="/projects/creativekillchamber/index.html" class="game-card" data-game-title="creativekillchamber">
+                    <img src="/projects/creativekillchamber/creativekillchamber.jpg" onerror="handleGameImageError(this)" alt="creativekillchamber Thumbnail">
+                    <div class="game-title">creativekillchamber</div>
+                </a>
+                <a href="/projects/csgo-clicker/index.html" class="game-card" data-game-title="csgo-clicker">
+                    <img src="/projects/csgo-clicker/csgo-clicker.jpg" onerror="handleGameImageError(this)" alt="csgo-clicker Thumbnail">
+                    <div class="game-title">csgo-clicker</div>
+                </a>
+                <a href="/projects/ctr/index.html" class="game-card" data-game-title="ctr">
+                    <img src="/projects/ctr/ctr.jpg" onerror="handleGameImageError(this)" alt="ctr Thumbnail">
+                    <div class="game-title">ctr</div>
+                </a>
+                <a href="/projects/ctr-holiday/index.html" class="game-card" data-game-title="ctr-holiday">
+                    <img src="/projects/ctr-holiday/ctr-holiday.jpg" onerror="handleGameImageError(this)" alt="ctr-holiday Thumbnail">
+                    <div class="game-title">ctr-holiday</div>
+                </a>
+                <a href="/projects/ctr-tr/index.html" class="game-card" data-game-title="ctr-tr">
+                    <img src="/projects/ctr-tr/ctr-tr.jpg" onerror="handleGameImageError(this)" alt="ctr-tr Thumbnail">
+                    <div class="game-title">ctr-tr</div>
+                </a>
+                <a href="/projects/cubefield/index.html" class="game-card" data-game-title="cubefield">
+                    <img src="/projects/cubefield/cubefield.jpg" onerror="handleGameImageError(this)" alt="cubefield Thumbnail">
+                    <div class="game-title">cubefield</div>
+                </a>
+                <a href="/projects/cupcake2048/index.html" class="game-card" data-game-title="cupcake2048">
+                    <img src="/projects/cupcake2048/cupcake2048.jpg" onerror="handleGameImageError(this)" alt="cupcake2048 Thumbnail">
+                    <div class="game-title">cupcake2048</div>
+                </a>
+                <a href="/projects/deal-or-no-deal/index.html" class="game-card" data-game-title="deal-or-no-deal">
+                    <img src="/projects/deal-or-no-deal/deal-or-no-deal.jpg" onerror="handleGameImageError(this)" alt="deal-or-no-deal Thumbnail">
+                    <div class="game-title">deal-or-no-deal</div>
+                </a>
+                <a href="/projects/death-run-3d/index.html" class="game-card" data-game-title="death-run-3d">
+                    <img src="/projects/death-run-3d/death-run-3d.jpg" onerror="handleGameImageError(this)" alt="death-run-3d Thumbnail">
+                    <div class="game-title">death-run-3d</div>
+                </a>
+                <a href="/projects/defend-the-tank/index.html" class="game-card" data-game-title="defend-the-tank">
+                    <img src="/projects/defend-the-tank/defend-the-tank.jpg" onerror="handleGameImageError(this)" alt="defend-the-tank Thumbnail">
+                    <div class="game-title">defend-the-tank</div>
+                </a>
+                <a href="/projects/doge2048/index.html" class="game-card" data-game-title="doge2048">
+                    <img src="/projects/doge2048/doge2048.jpg" onerror="handleGameImageError(this)" alt="doge2048 Thumbnail">
+                    <div class="game-title">doge2048</div>
+                </a>
+                <a href="/projects/doodle-jump/index.html" class="game-card" data-game-title="doodle-jump">
+                    <img src="/projects/doodle-jump/doodle-jump.jpg" onerror="handleGameImageError(this)" alt="doodle-jump Thumbnail">
+                    <div class="game-title">doodle-jump</div>
+                </a>
+                <a href="/projects/doom/index.html" class="game-card" data-game-title="doom">
+                    <img src="/projects/doom/doom.jpg" onerror="handleGameImageError(this)" alt="doom Thumbnail">
+                    <div class="game-title">doom</div>
+                </a>
+                <a href="/projects/doublewires/index.html" class="game-card" data-game-title="doublewires">
+                    <img src="/projects/doublewires/doublewires.jpg" onerror="handleGameImageError(this)" alt="doublewires Thumbnail">
+                    <div class="game-title">doublewires</div>
+                </a>
+                <a href="/projects/draw-the-hill/index.html" class="game-card" data-game-title="draw-the-hill">
+                    <img src="/projects/draw-the-hill/draw-the-hill.jpg" onerror="handleGameImageError(this)" alt="draw-the-hill Thumbnail">
+                    <div class="game-title">draw-the-hill</div>
+                </a>
+                <a href="/projects/ducklife1/index.html" class="game-card" data-game-title="ducklife1">
+                    <img src="/projects/ducklife1/ducklife1.jpg" onerror="handleGameImageError(this)" alt="ducklife1 Thumbnail">
+                    <div class="game-title">ducklife1</div>
+                </a>
+                <a href="/projects/ducklife2/index.html" class="game-card" data-game-title="ducklife2">
+                    <img src="/projects/ducklife2/ducklife2.jpg" onerror="handleGameImageError(this)" alt="ducklife2 Thumbnail">
+                    <div class="game-title">ducklife2</div>
+                </a>
+                <a href="/projects/ducklife3/index.html" class="game-card" data-game-title="ducklife3">
+                    <img src="/projects/ducklife3/ducklife3.jpg" onerror="handleGameImageError(this)" alt="ducklife3 Thumbnail">
+                    <div class="game-title">ducklife3</div>
+                </a>
+                <a href="/projects/edgenotfound/index.html" class="game-card" data-game-title="edgenotfound">
+                    <img src="/projects/edgenotfound/edgenotfound.jpg" onerror="handleGameImageError(this)" alt="edgenotfound Thumbnail">
+                    <div class="game-title">edgenotfound</div>
+                </a>
+                <a href="/projects/elasticman/index.html" class="game-card" data-game-title="elasticman">
+                    <img src="/projects/elasticman/elasticman.jpg" onerror="handleGameImageError(this)" alt="elasticman Thumbnail">
+                    <div class="game-title">elasticman</div>
+                </a>
+                <a href="/projects/endlesswar3/index.html" class="game-card" data-game-title="endlesswar3">
+                    <img src="/projects/endlesswar3/endlesswar3.jpg" onerror="handleGameImageError(this)" alt="endlesswar3 Thumbnail">
+                    <div class="game-title">endlesswar3</div>
+                </a>
+                <a href="/projects/evil-glitch/index.html" class="game-card" data-game-title="evil-glitch">
+                    <img src="/projects/evil-glitch/evil-glitch.jpg" onerror="handleGameImageError(this)" alt="evil-glitch Thumbnail">
+                    <div class="game-title">evil-glitch</div>
+                </a>
+                <a href="/projects/exo/index.html" class="game-card" data-game-title="exo">
+                    <img src="/projects/exo/exo.jpg" onerror="handleGameImageError(this)" alt="exo Thumbnail">
+                    <div class="game-title">exo</div>
+                </a>
+                <a href="/projects/factoryballs/index.html" class="game-card" data-game-title="factoryballs">
+                    <img src="/projects/factoryballs/factoryballs.jpg" onerror="handleGameImageError(this)" alt="factoryballs Thumbnail">
+                    <div class="game-title">factoryballs</div>
+                </a>
+                <a href="/projects/fake-virus/index.html" class="game-card" data-game-title="fake-virus">
+                    <img src="/projects/fake-virus/fake-virus.jpg" onerror="handleGameImageError(this)" alt="fake-virus Thumbnail">
+                    <div class="game-title">fake-virus</div>
+                </a>
+                <a href="/projects/flappy-2048/index.html" class="game-card" data-game-title="flappy-2048">
+                    <img src="/projects/flappy-2048/flappy-2048.jpg" onerror="handleGameImageError(this)" alt="flappy-2048 Thumbnail">
+                    <div class="game-title">flappy-2048</div>
+                </a>
+                <a href="/projects/flappy-bird/index.html" class="game-card" data-game-title="flappy-bird">
+                    <img src="/projects/flappy-bird/flappy-bird.jpg" onerror="handleGameImageError(this)" alt="flappy-bird Thumbnail">
+                    <div class="game-title">flappy-bird</div>
+                </a>
+                <a href="/projects/flashtetris/index.html" class="game-card" data-game-title="flashtetris">
+                    <img src="/projects/flashtetris/flashtetris.jpg" onerror="handleGameImageError(this)" alt="flashtetris Thumbnail">
+                    <div class="game-title">flashtetris</div>
+                </a>
+                <a href="/projects/game-inside/index.html" class="game-card" data-game-title="game-inside">
+                    <img src="/projects/game-inside/game-inside.jpg" onerror="handleGameImageError(this)" alt="game-inside Thumbnail">
+                    <div class="game-title">game-inside</div>
+                </a>
+                <a href="/projects/geodash/index.html" class="game-card" data-game-title="geodash">
+                    <img src="/projects/geodash/geodash.jpg" onerror="handleGameImageError(this)" alt="geodash Thumbnail">
+                    <div class="game-title">geodash</div>
+                </a>
+                <a href="/projects/getaway-shootout/index.html" class="game-card" data-game-title="getaway-shootout">
+                    <img src="/projects/getaway-shootout/getaway-shootout.jpg" onerror="handleGameImageError(this)" alt="getaway-shootout Thumbnail">
+                    <div class="game-title">getaway-shootout</div>
+                </a>
+                <a href="/projects/gimme-the-airpod/index.html" class="game-card" data-game-title="gimme-the-airpod">
+                    <img src="/projects/gimme-the-airpod/gimme-the-airpod.jpg" onerror="handleGameImageError(this)" alt="gimme-the-airpod Thumbnail">
+                    <div class="game-title">gimme-the-airpod</div>
+                </a>
+                <a href="/projects/glass-city/index.html" class="game-card" data-game-title="glass-city">
+                    <img src="/projects/glass-city/glass-city.jpg" onerror="handleGameImageError(this)" alt="glass-city Thumbnail">
+                    <div class="game-title">glass-city</div>
+                </a>
+                <a href="/projects/google-snake/index.html" class="game-card" data-game-title="google-snake">
+                    <img src="/projects/google-snake/google-snake.jpg" onerror="handleGameImageError(this)" alt="google-snake Thumbnail">
+                    <div class="game-title">google-snake</div>
+                </a>
+                <a href="/projects/grindcraft/index.html" class="game-card" data-game-title="grindcraft">
+                    <img src="/projects/grindcraft/grindcraft.jpg" onerror="handleGameImageError(this)" alt="grindcraft Thumbnail">
+                    <div class="game-title">grindcraft</div>
+                </a>
+                <a href="/projects/hackertype/index.html" class="game-card" data-game-title="hackertype">
+                    <img src="/projects/hackertype/hackertype.jpg" onerror="handleGameImageError(this)" alt="hackertype Thumbnail">
+                    <div class="game-title">hackertype</div>
+                </a>
+                <a href="/projects/hba/index.html" class="game-card" data-game-title="hba">
+                    <img src="/projects/hba/hba.jpg" onerror="handleGameImageError(this)" alt="hba Thumbnail">
+                    <div class="game-title">hba</div>
+                </a>
+                <a href="/projects/helicopter/index.html" class="game-card" data-game-title="helicopter">
+                    <img src="/projects/helicopter/helicopter.jpg" onerror="handleGameImageError(this)" alt="helicopter Thumbnail">
+                    <div class="game-title">helicopter</div>
+                </a>
+                <a href="/projects/hexempire/index.html" class="game-card" data-game-title="hexempire">
+                    <img src="/projects/hexempire/hexempire.jpg" onerror="handleGameImageError(this)" alt="hexempire Thumbnail">
+                    <div class="game-title">hexempire</div>
+                </a>
+                <a href="/projects/hextris/index.html" class="game-card" data-game-title="hextris">
+                    <img src="/projects/hextris/hextris.jpg" onerror="handleGameImageError(this)" alt="hextris Thumbnail">
+                    <div class="game-title">hextris</div>
+                </a>
+                <a href="/projects/idle-breakout/index.html" class="game-card" data-game-title="idle-breakout">
+                    <img src="/projects/idle-breakout/idle-breakout.jpg" onerror="handleGameImageError(this)" alt="idle-breakout Thumbnail">
+                    <div class="game-title">idle-breakout</div>
+                </a>
+                <a href="/projects/idle-shark/index.html" class="game-card" data-game-title="idle-shark">
+                    <img src="/projects/idle-shark/idle-shark.jpg" onerror="handleGameImageError(this)" alt="idle-shark Thumbnail">
+                    <div class="game-title">idle-shark</div>
+                </a>
+                <a href="/projects/impossiblequiz/index.html" class="game-card" data-game-title="impossiblequiz">
+                    <img src="/projects/impossiblequiz/impossiblequiz.jpg" onerror="handleGameImageError(this)" alt="impossiblequiz Thumbnail">
+                    <div class="game-title">impossiblequiz</div>
+                </a>
+                <a href="/projects/interactivebuddy/index.html" class="game-card" data-game-title="interactivebuddy">
+                    <img src="/projects/interactivebuddy/interactivebuddy.jpg" onerror="handleGameImageError(this)" alt="interactivebuddy Thumbnail">
+                    <div class="game-title">interactivebuddy</div>
+                </a>
+                <a href="/projects/just-one-boss/index.html" class="game-card" data-game-title="just-one-boss">
+                    <img src="/projects/just-one-boss/just-one-boss.jpg" onerror="handleGameImageError(this)" alt="just-one-boss Thumbnail">
+                    <div class="game-title">just-one-boss</div>
+                </a>
+                <a href="/projects/kittencannon/index.html" class="game-card" data-game-title="kittencannon">
+                    <img src="/projects/kittencannon/kittencannon.jpg" onerror="handleGameImageError(this)" alt="kittencannon Thumbnail">
+                    <div class="game-title">kittencannon</div>
+                </a>
+                <a href="/projects/krunker/index.html" class="game-card" data-game-title="krunker">
+                    <img src="/projects/krunker/krunker.jpg" onerror="handleGameImageError(this)" alt="krunker Thumbnail">
+                    <div class="game-title">krunker</div>
+                </a>
+                <a href="/projects/learntofly/index.html" class="game-card" data-game-title="learntofly">
+                    <img src="/projects/learntofly/learntofly.jpg" onerror="handleGameImageError(this)" alt="learntofly Thumbnail">
+                    <div class="game-title">learntofly</div>
+                </a>
+                <a href="/projects/mario/index.html" class="game-card" data-game-title="mario">
+                    <img src="/projects/mario/mario.jpg" onerror="handleGameImageError(this)" alt="mario Thumbnail">
+                    <div class="game-title">mario</div>
+                </a>
+                <a href="/projects/matrixrampage/index.html" class="game-card" data-game-title="matrixrampage">
+                    <img src="/projects/matrixrampage/matrixrampage.jpg" onerror="handleGameImageError(this)" alt="matrixrampage Thumbnail">
+                    <div class="game-title">matrixrampage</div>
+                </a>
+                <a href="/projects/meme2048/index.html" class="game-card" data-game-title="meme2048">
+                    <img src="/projects/meme2048/meme2048.jpg" onerror="handleGameImageError(this)" alt="meme2048 Thumbnail">
+                    <div class="game-title">meme2048</div>
+                </a>
+                <a href="/projects/minecraft-classic/index.html" class="game-card" data-game-title="minecraft-classic">
+                    <img src="/projects/minecraft-classic/minecraft-classic.jpg" onerror="handleGameImageError(this)" alt="minecraft-classic Thumbnail">
+                    <div class="game-title">minecraft-classic</div>
+                </a>
+                <a href="/projects/minesweeper/index.html" class="game-card" data-game-title="minesweeper">
+                    <img src="/projects/minesweeper/minesweeper.jpg" onerror="handleGameImageError(this)" alt="minesweeper Thumbnail">
+                    <div class="game-title">minesweeper</div>
+                </a>
+                <a href="/projects/miniputt/index.html" class="game-card" data-game-title="miniputt">
+                    <img src="/projects/miniputt/miniputt.jpg" onerror="handleGameImageError(this)" alt="miniputt Thumbnail">
+                    <div class="game-title">miniputt</div>
+                </a>
+                <a href="/projects/missiles/index.html" class="game-card" data-game-title="missiles">
+                    <img src="/projects/missiles/missiles.jpg" onerror="handleGameImageError(this)" alt="missiles Thumbnail">
+                    <div class="game-title">missiles</div>
+                </a>
+                <a href="/projects/motox3m/index.html" class="game-card" data-game-title="motox3m">
+                    <img src="/projects/motox3m/motox3m.jpg" onerror="handleGameImageError(this)" alt="motox3m Thumbnail">
+                    <div class="game-title">motox3m</div>
+                </a>
+                <a href="/projects/motox3m-pool/index.html" class="game-card" data-game-title="motox3m-pool">
+                    <img src="/projects/motox3m-pool/motox3m-pool.jpg" onerror="handleGameImageError(this)" alt="motox3m-pool Thumbnail">
+                    <div class="game-title">motox3m-pool</div>
+                </a>
+                <a href="/projects/motox3m-spooky/index.html" class="game-card" data-game-title="motox3m-spooky">
+                    <img src="/projects/motox3m-spooky/motox3m-spooky.jpg" onerror="handleGameImageError(this)" alt="motox3m-spooky Thumbnail">
+                    <div class="game-title">motox3m-spooky</div>
+                </a>
+                <a href="/projects/motox3m-winter/index.html" class="game-card" data-game-title="motox3m-winter">
+                    <img src="/projects/motox3m-winter/motox3m-winter.jpg" onerror="handleGameImageError(this)" alt="motox3m-winter Thumbnail">
+                    <div class="game-title">motox3m-winter</div>
+                </a>
+                <a href="/projects/n-gon/index.html" class="game-card" data-game-title="n-gon">
+                    <img src="/projects/n-gon/n-gon.jpg" onerror="handleGameImageError(this)" alt="n-gon Thumbnail">
+                    <div class="game-title">n-gon</div>
+                </a>
+                <a href="/projects/ns-shaft/index.html" class="game-card" data-game-title="ns-shaft">
+                    <img src="/projects/ns-shaft/ns-shaft.jpg" onerror="handleGameImageError(this)" alt="ns-shaft Thumbnail">
+                    <div class="game-title">ns-shaft</div>
+                </a>
+                <a href="/projects/om-bounce/index.html" class="game-card" data-game-title="om-bounce">
+                    <img src="/projects/om-bounce/om-bounce.jpg" onerror="handleGameImageError(this)" alt="om-bounce Thumbnail">
+                    <div class="game-title">om-bounce</div>
+                </a>
+                <a href="/projects/pandemic2/index.html" class="game-card" data-game-title="pandemic2">
+                    <img src="/projects/pandemic2/pandemic2.jpg" onerror="handleGameImageError(this)" alt="pandemic2 Thumbnail">
+                    <div class="game-title">pandemic2</div>
+                </a>
+                <a href="/projects/papaspizzaria/index.html" class="game-card" data-game-title="papaspizzaria">
+                    <img src="/projects/papaspizzaria/papaspizzaria.jpg" onerror="handleGameImageError(this)" alt="papaspizzaria Thumbnail">
+                    <div class="game-title">papaspizzaria</div>
+                </a>
+                <a href="/projects/paperio2/index.html" class="game-card" data-game-title="paperio2">
+                    <img src="/projects/paperio2/paperio2.jpg" onerror="handleGameImageError(this)" alt="paperio2 Thumbnail">
+                    <div class="game-title">paperio2</div>
+                </a>
+                <a href="/projects/papery-planes/index.html" class="game-card" data-game-title="papery-planes">
+                    <img src="/projects/papery-planes/papery-planes.jpg" onerror="handleGameImageError(this)" alt="papery-planes Thumbnail">
+                    <div class="game-title">papery-planes</div>
+                </a>
+                <a href="/projects/particle-clicker/index.html" class="game-card" data-game-title="particle-clicker">
+                    <img src="/projects/particle-clicker/particle-clicker.jpg" onerror="handleGameImageError(this)" alt="particle-clicker Thumbnail">
+                    <div class="game-title">particle-clicker</div>
+                </a>
+                <a href="/projects/polybranch/index.html" class="game-card" data-game-title="polybranch">
+                    <img src="/projects/polybranch/polybranch.jpg" onerror="handleGameImageError(this)" alt="polybranch Thumbnail">
+                    <div class="game-title">polybranch</div>
+                </a>
+                <a href="/projects/portalflash/index.html" class="game-card" data-game-title="portalflash">
+                    <img src="/projects/portalflash/portalflash.jpg" onerror="handleGameImageError(this)" alt="portalflash Thumbnail">
+                    <div class="game-title">portalflash</div>
+                </a>
+                <a href="/projects/push-the-square/index.html" class="game-card" data-game-title="push-the-square">
+                    <img src="/projects/push-the-square/push-the-square.jpg" onerror="handleGameImageError(this)" alt="push-the-square Thumbnail">
+                    <div class="game-title">push-the-square</div>
+                </a>
+                <a href="/projects/push-your-luck/index.html" class="game-card" data-game-title="push-your-luck">
+                    <img src="/projects/push-your-luck/push-your-luck.jpg" onerror="handleGameImageError(this)" alt="push-your-luck Thumbnail">
+                    <div class="game-title">push-your-luck</div>
+                </a>
+                <a href="/projects/retro-bowl/index.html" class="game-card" data-game-title="retro-bowl">
+                    <img src="/projects/retro-bowl/retro-bowl.jpg" onerror="handleGameImageError(this)" alt="retro-bowl Thumbnail">
+                    <div class="game-title">retro-bowl</div>
+                </a>
+                <a href="/projects/rh/index.html" class="game-card" data-game-title="rh">
+                    <img src="/projects/rh/rh.jpg" onerror="handleGameImageError(this)" alt="rh Thumbnail">
+                    <div class="game-title">rh</div>
+                </a>
+                <a href="/projects/rolly-vortex/index.html" class="game-card" data-game-title="rolly-vortex">
+                    <img src="/projects/rolly-vortex/rolly-vortex.jpg" onerror="handleGameImageError(this)" alt="rolly-vortex Thumbnail">
+                    <div class="game-title">rolly-vortex</div>
+                </a>
+                <a href="/projects/rooftop-snipers/index.html" class="game-card" data-game-title="rooftop-snipers">
+                    <img src="/projects/rooftop-snipers/rooftop-snipers.jpg" onerror="handleGameImageError(this)" alt="rooftop-snipers Thumbnail">
+                    <div class="game-title">rooftop-snipers</div>
+                </a>
+                <a href="/projects/sand-game/index.html" class="game-card" data-game-title="sand-game">
+                    <img src="/projects/sand-game/sand-game.jpg" onerror="handleGameImageError(this)" alt="sand-game Thumbnail">
+                    <div class="game-title">sand-game</div>
+                </a>
+                <a href="/projects/sandboxels/index.html" class="game-card" data-game-title="sandboxels">
+                    <img src="/projects/sandboxels/sandboxels.jpg" onerror="handleGameImageError(this)" alt="sandboxels Thumbnail">
+                    <div class="game-title">sandboxels</div>
+                </a>
+                <a href="/projects/slope/index.html" class="game-card" data-game-title="slope">
+                    <img src="/projects/slope/slope.jpg" onerror="handleGameImageError(this)" alt="slope Thumbnail">
+                    <div class="game-title">slope</div>
+                </a>
+                <a href="/projects/sm64/index.html" class="game-card" data-game-title="sm64">
+                    <img src="/projects/sm64/sm64.jpg" onerror="handleGameImageError(this)" alt="sm64 Thumbnail">
+                    <div class="game-title">sm64</div>
+                </a>
+                <a href="/projects/sm64-main/index.html" class="game-card" data-game-title="sm64-main">
+                    <img src="/projects/sm64-main/sm64-main.jpg" onerror="handleGameImageError(this)" alt="sm64-main Thumbnail">
+                    <div class="game-title">sm64-main</div>
+                </a>
+                <a href="/projects/smashkarts/index.html" class="game-card" data-game-title="smashkarts">
+                    <img src="/projects/smashkarts/smashkarts.jpg" onerror="handleGameImageError(this)" alt="smashkarts Thumbnail">
+                    <div class="game-title">smashkarts</div>
+                </a>
+                <a href="/projects/smokingbarrels/index.html" class="game-card" data-game-title="smokingbarrels">
+                    <img src="/projects/smokingbarrels/smokingbarrels.jpg" onerror="handleGameImageError(this)" alt="smokingbarrels Thumbnail">
+                    <div class="game-title">smokingbarrels</div>
+                </a>
+                <a href="/projects/snowbattle/index.html" class="game-card" data-game-title="snowbattle">
+                    <img src="/projects/snowbattle/snowbattle.jpg" onerror="handleGameImageError(this)" alt="snowbattle Thumbnail">
+                    <div class="game-title">snowbattle</div>
+                </a>
+                <a href="/projects/soldier-legend/index.html" class="game-card" data-game-title="soldier-legend">
+                    <img src="/projects/soldier-legend/soldier-legend.jpg" onerror="handleGameImageError(this)" alt="soldier-legend Thumbnail">
+                    <div class="game-title">soldier-legend</div>
+                </a>
+                <a href="/projects/solitaire/index.html" class="game-card" data-game-title="solitaire">
+                    <img src="/projects/solitaire/solitaire.jpg" onerror="handleGameImageError(this)" alt="solitaire Thumbnail">
+                    <div class="game-title">solitaire</div>
+                </a>
+                <a href="/projects/sort-the-court/index.html" class="game-card" data-game-title="sort-the-court">
+                    <img src="/projects/sort-the-court/sort-the-court.jpg" onerror="handleGameImageError(this)" alt="sort-the-court Thumbnail">
+                    <div class="game-title">sort-the-court</div>
+                </a>
+                <a href="/projects/soundboard/index.html" class="game-card" data-game-title="soundboard">
+                    <img src="/projects/soundboard/soundboard.jpg" onerror="handleGameImageError(this)" alt="soundboard Thumbnail">
+                    <div class="game-title">soundboard</div>
+                </a>
+                <a href="/projects/stack/index.html" class="game-card" data-game-title="stack">
+                    <img src="/projects/stack/stack.jpg" onerror="handleGameImageError(this)" alt="stack Thumbnail">
+                    <div class="game-title">stack</div>
+                </a>
+                <a href="/projects/stack-bump-3d/index.html" class="game-card" data-game-title="stack-bump-3d">
+                    <img src="/projects/stack-bump-3d/stack-bump-3d.jpg" onerror="handleGameImageError(this)" alt="stack-bump-3d Thumbnail">
+                    <div class="game-title">stack-bump-3d</div>
+                </a>
+                <a href="/projects/stealingthediamond/index.html" class="game-card" data-game-title="stealingthediamond">
+                    <img src="/projects/stealingthediamond/stealingthediamond.jpg" onerror="handleGameImageError(this)" alt="stealingthediamond Thumbnail">
+                    <div class="game-title">stealingthediamond</div>
+                </a>
+                <a href="/projects/stickwar/index.html" class="game-card" data-game-title="stickwar">
+                    <img src="/projects/stickwar/stickwar.jpg" onerror="handleGameImageError(this)" alt="stickwar Thumbnail">
+                    <div class="game-title">stickwar</div>
+                </a>
+                <a href="/projects/stormthehouse2/index.html" class="game-card" data-game-title="stormthehouse2">
+                    <img src="/projects/stormthehouse2/stormthehouse2.jpg" onerror="handleGameImageError(this)" alt="stormthehouse2 Thumbnail">
+                    <div class="game-title">stormthehouse2</div>
+                </a>
+                <a href="/projects/superhot/index.html" class="game-card" data-game-title="superhot">
+                    <img src="/projects/superhot/superhot.jpg" onerror="handleGameImageError(this)" alt="superhot Thumbnail">
+                    <div class="game-title">superhot</div>
+                </a>
+                <a href="/projects/swerve/index.html" class="game-card" data-game-title="swerve">
+                    <img src="/projects/swerve/swerve.jpg" onerror="handleGameImageError(this)" alt="swerve Thumbnail">
+                    <div class="game-title">swerve</div>
+                </a>
+                <a href="/projects/tacticalassasin2/index.html" class="game-card" data-game-title="tacticalassasin2">
+                    <img src="/projects/tacticalassasin2/tacticalassasin2.jpg" onerror="handleGameImageError(this)" alt="tacticalassasin2 Thumbnail">
+                    <div class="game-title">tacticalassasin2</div>
+                </a>
+                <a href="/projects/tank-trouble-2/index.html" class="game-card" data-game-title="tank-trouble-2">
+                    <img src="/projects/tank-trouble-2/tank-trouble-2.jpg" onerror="handleGameImageError(this)" alt="tank-trouble-2 Thumbnail">
+                    <div class="game-title">tank-trouble-2</div>
+                </a>
+                <a href="/projects/tanuki-sunset/index.html" class="game-card" data-game-title="tanuki-sunset">
+                    <img src="/projects/tanuki-sunset/tanuki-sunset.jpg" onerror="handleGameImageError(this)" alt="tanuki-sunset Thumbnail">
+                    <div class="game-title">tanuki-sunset</div>
+                </a>
+                <a href="/projects/temple-run-2/index.html" class="game-card" data-game-title="temple-run-2">
+                    <img src="/projects/temple-run-2/temple-run-2.jpg" onerror="handleGameImageError(this)" alt="temple-run-2 Thumbnail">
+                    <div class="game-title">temple-run-2</div>
+                </a>
+                <a href="/projects/the-final-earth/index.html" class="game-card" data-game-title="the-final-earth">
+                    <img src="/projects/the-final-earth/the-final-earth.jpg" onerror="handleGameImageError(this)" alt="the-final-earth Thumbnail">
+                    <div class="game-title">the-final-earth</div>
+                </a>
+                <a href="/projects/thebattle/index.html" class="game-card" data-game-title="thebattle">
+                    <img src="/projects/thebattle/thebattle.jpg" onerror="handleGameImageError(this)" alt="thebattle Thumbnail">
+                    <div class="game-title">thebattle</div>
+                </a>
+                <a href="/projects/theheist/index.html" class="game-card" data-game-title="theheist">
+                    <img src="/projects/theheist/theheist.jpg" onerror="handleGameImageError(this)" alt="theheist Thumbnail">
+                    <div class="game-title">theheist</div>
+                </a>
+                <a href="/projects/there-is-no-game/index.html" class="game-card" data-game-title="there-is-no-game">
+                    <img src="/projects/there-is-no-game/there-is-no-game.jpg" onerror="handleGameImageError(this)" alt="there-is-no-game Thumbnail">
+                    <div class="game-title">there-is-no-game</div>
+                </a>
+                <a href="/projects/thisistheonlylevel/index.html" class="game-card" data-game-title="thisistheonlylevel">
+                    <img src="/projects/thisistheonlylevel/thisistheonlylevel.jpg" onerror="handleGameImageError(this)" alt="thisistheonlylevel Thumbnail">
+                    <div class="game-title">thisistheonlylevel</div>
+                </a>
+                <a href="/projects/tosstheturtle/index.html" class="game-card" data-game-title="tosstheturtle">
+                    <img src="/projects/tosstheturtle/tosstheturtle.jpg" onerror="handleGameImageError(this)" alt="tosstheturtle Thumbnail">
+                    <div class="game-title">tosstheturtle</div>
+                </a>
+                <a href="/projects/tube-jumpers/index.html" class="game-card" data-game-title="tube-jumpers">
+                    <img src="/projects/tube-jumpers/tube-jumpers.jpg" onerror="handleGameImageError(this)" alt="tube-jumpers Thumbnail">
+                    <div class="game-title">tube-jumpers</div>
+                </a>
+                <a href="/projects/tunnel-rush/index.html" class="game-card" data-game-title="tunnel-rush">
+                    <img src="/projects/tunnel-rush/tunnel-rush.jpg" onerror="handleGameImageError(this)" alt="tunnel-rush Thumbnail">
+                    <div class="game-title">tunnel-rush</div>
+                </a>
+                <a href="/projects/tv-static/index.html" class="game-card" data-game-title="tv-static">
+                    <img src="/projects/tv-static/tv-static.jpg" onerror="handleGameImageError(this)" alt="tv-static Thumbnail">
+                    <div class="game-title">tv-static</div>
+                </a>
+                <a href="/projects/vex3/index.html" class="game-card" data-game-title="vex3">
+                    <img src="/projects/vex3/vex3.jpg" onerror="handleGameImageError(this)" alt="vex3 Thumbnail">
+                    <div class="game-title">vex3</div>
+                </a>
+                <a href="/projects/vex4/index.html" class="game-card" data-game-title="vex4">
+                    <img src="/projects/vex4/vex4.jpg" onerror="handleGameImageError(this)" alt="vex4 Thumbnail">
+                    <div class="game-title">vex4</div>
+                </a>
+                <a href="/projects/vex5/index.html" class="game-card" data-game-title="vex5">
+                    <img src="/projects/vex5/vex5.jpg" onerror="handleGameImageError(this)" alt="vex5 Thumbnail">
+                    <div class="game-title">vex5</div>
+                </a>
+                <a href="/projects/vex6/index.html" class="game-card" data-game-title="vex6">
+                    <img src="/projects/vex6/vex6.jpg" onerror="handleGameImageError(this)" alt="vex6 Thumbnail">
+                    <div class="game-title">vex6</div>
+                </a>
+                <a href="/projects/webretro/index.html" class="game-card" data-game-title="webretro">
+                    <img src="/projects/webretro/webretro.jpg" onerror="handleGameImageError(this)" alt="webretro Thumbnail">
+                    <div class="game-title">webretro</div>
+                </a>
+                <a href="/projects/webretro-local/index.html" class="game-card" data-game-title="webretro-local">
+                    <img src="/projects/webretro-local/webretro-local.jpg" onerror="handleGameImageError(this)" alt="webretro-local Thumbnail">
+                    <div class="game-title">webretro-local</div>
+                </a>
+                <a href="/projects/wolf3d/index.html" class="game-card" data-game-title="wolf3d">
+                    <img src="/projects/wolf3d/wolf3d.jpg" onerror="handleGameImageError(this)" alt="wolf3d Thumbnail">
+                    <div class="game-title">wolf3d</div>
+                </a>
+                <a href="/projects/wordle/index.html" class="game-card" data-game-title="wordle">
+                    <img src="/projects/wordle/wordle.jpg" onerror="handleGameImageError(this)" alt="wordle Thumbnail">
+                    <div class="game-title">wordle</div>
+                </a>
+                <a href="/projects/worlds-hardest-game/index.html" class="game-card" data-game-title="worlds-hardest-game">
+                    <img src="/projects/worlds-hardest-game/worlds-hardest-game.jpg" onerror="handleGameImageError(this)" alt="worlds-hardest-game Thumbnail">
+                    <div class="game-title">worlds-hardest-game</div>
+                </a>
+                <a href="/projects/worlds-hardest-game-2/index.html" class="game-card" data-game-title="worlds-hardest-game-2">
+                    <img src="/projects/worlds-hardest-game-2/worlds-hardest-game-2.jpg" onerror="handleGameImageError(this)" alt="worlds-hardest-game-2 Thumbnail">
+                    <div class="game-title">worlds-hardest-game-2</div>
+                </a>
+                <a href="/projects/worlds-hardest-game-3/index.html" class="game-card" data-game-title="worlds-hardest-game-3">
+                    <img src="/projects/worlds-hardest-game-3/worlds-hardest-game-3.jpg" onerror="handleGameImageError(this)" alt="worlds-hardest-game-3 Thumbnail">
+                    <div class="game-title">worlds-hardest-game-3</div>
+                </a>
+                <a href="/projects/you-are-bezos/index.html" class="game-card" data-game-title="you-are-bezos">
+                    <img src="/projects/you-are-bezos/you-are-bezos.jpg" onerror="handleGameImageError(this)" alt="you-are-bezos Thumbnail">
+                    <div class="game-title">you-are-bezos</div>
+                </a>
+                <a href="/projects/zombs-royale/index.html" class="game-card" data-game-title="zombs-royale">
+                    <img src="/projects/zombs-royale/zombs-royale.jpg" onerror="handleGameImageError(this)" alt="zombs-royale Thumbnail">
+                    <div class="game-title">zombs-royale</div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic Game Window Container -->
+    <div id="dynamicGameWindows"></div>
+
+    <script>
+        // Store window states for maximize/restore functionality
+        const windowStates = {};
+        // MAX_RECENT_GAMES set to 3 (5 built-in + 3 recent = 8 total icons in dock)
+        const MAX_RECENT_GAMES = 3;
+        const RECENT_GAMES_STORAGE_KEY = 'v4l_recent_games';
+        const DARK_MODE_STORAGE_KEY = 'v4l_dark_mode';
+        const CUSTOM_BG_STORAGE_KEY = 'v4l_custom_background';
+        const dynamicGameWindowsContainer = document.getElementById('dynamicGameWindows');
+        const mainDock = document.getElementById('mainDock');
+        const launchpadButton = document.getElementById('launchpadButton');
+        const settingsButton = document.getElementById('settingsButton');
+        const finderDockItem = document.getElementById('finderDockItem'); // Get Finder by its ID
+        const v4lTextButton = document.getElementById('v4lTextButton');
+        const v4lPaintButton = document.getElementById('v4lPaintButton');
+
+        /**
+         * Handles image loading errors for game icons (Launchpad cards and recent dock items).
+         * Attempts to load fallback image URLs in a predefined order before resorting to a generic placeholder.
+         * @param {HTMLImageElement} imageElement - The <img> element that triggered the error.
+         */
+        function handleGameImageError(imageElement) {
+            imageElement.onerror = null; // Clear the current onerror to prevent infinite loops for this attempt
+
+            const parentElement = imageElement.closest('.game-card') || imageElement.closest('.dock-item');
+            if (!parentElement) {
+                console.error("Parent element (game-card or dock-item) not found for game image error handler.");
+                imageElement.src = `https://placehold.co/90x90/${document.body.getAttribute('data-theme') === 'dark' ? '444444' : 'e0e0e0'}/${document.body.getAttribute('data-theme') === 'dark' ? 'bbbbbb' : '555555'}?text=${encodeURIComponent('No Image')}`;
+                return;
+            }
+
+            const gameTitle = parentElement.getAttribute('data-game-title') || parentElement.getAttribute('data-app-title');
+            const gameUrl = parentElement.href || parentElement.getAttribute('data-app-url');
+
+            if (!gameTitle || !gameUrl) {
+                console.error("Game title or URL missing from parent for game image error handler.");
+                imageElement.src = `https://placehold.co/90x90/${document.body.getAttribute('data-theme') === 'dark' ? '444444' : 'e0e0e0'}/${document.body.getAttribute('data-theme') === 'dark' ? 'bbbbbb' : '555555'}?text=${encodeURIComponent('No Image')}`;
+                return;
+            }
+
+            // Extract base path (e.g., "/projects/game_name/" from "/projects/game_name/index.html")
+            const pathSegments = gameUrl.split('/');
+            let basePath = '';
+            if (pathSegments.length >= 3 && pathSegments[1] === 'projects') {
+                basePath = `/${pathSegments[1]}/${pathSegments[2]}/`;
+            } else {
+                // Fallback for non-game apps if this function is mistakenly called for them
+                basePath = gameUrl.substring(0, gameUrl.lastIndexOf('/') + 1);
+            }
+
+            // Define the sequence of fallback attempts
+            const fallbackImageUrls = [
+                `${basePath}${gameTitle}.png`,     // Try PNG first
+                `${basePath}${gameTitle}.jpg`,     // Then JPG (original could be this)
+                `${basePath}icon.png`,             // Then generic icon.png
+                `${basePath}favicon.ico`           // Finally favicon.ico
+            ];
+
+            // Get current attempt index from a data attribute. Initialize to -1 if not set.
+            let currentAttemptIndex = parseInt(imageElement.dataset.attemptIndex || '-1', 10);
+            currentAttemptIndex++; // Move to the next attempt in the fallback sequence
+
+            if (currentAttemptIndex < fallbackImageUrls.length) {
+                imageElement.src = fallbackImageUrls[currentAttemptIndex];
+                imageElement.dataset.attemptIndex = currentAttemptIndex.toString(); // Store the updated index
+                // Re-attach onerror to itself for the next attempt in the chain
+                imageElement.onerror = () => handleGameImageError(imageElement);
+            } else {
+                // All specific fallbacks exhausted, use the final generic placeholder
+                console.warn(`All fallback image paths failed for ${gameTitle}. Using generic placeholder.`);
+                const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+                const size = imageElement.classList.contains('dock-icon-img') ? '48x48' : '90x90';
+                imageElement.src = `https://placehold.co/${size}/${isDarkMode ? '444444' : 'e0e0e0'}/${isDarkMode ? 'bbbbbb' : '555555'}?text=${encodeURIComponent('No Image')}`;
+            }
+        }
+
+        /**
+         * Handles image loading errors for the 5 static system icons in the dock.
+         * Replaces the failed image with a corresponding Phosphor icon.
+         * @param {HTMLImageElement} imageElement - The <img> element that triggered the error.
+         */
+        function handleDockSystemIconError(imageElement) {
+            imageElement.onerror = null; // Prevent infinite loop
+
+            const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+            const altText = imageElement.alt; // e.g., "Launchpad", "Settings"
+            let phosphorClass = '';
+
+            if (altText === 'Launchpad') { phosphorClass = 'ph ph-squares-four'; }
+            else if (altText === 'Settings') { phosphorClass = 'ph ph-gear'; }
+            else if (altText === 'Finder') { phosphorClass = 'ph ph-folder-open'; }
+            else if (altText === 'V4Ltext Icon') { phosphorClass = 'ph ph-file-text'; }
+            else if (altText === 'V4LPaint Icon') { phosphorClass = 'ph ph-palette'; }
+
+            if (phosphorClass) { // Only replace if it's one of the specific system icons
+                const newIconElement = document.createElement('i');
+                const classesToAdd = phosphorClass.split(' ').filter(cls => cls);
+                classesToAdd.push('phosphor-icon');
+                newIconElement.classList.add(...classesToAdd);
+                imageElement.replaceWith(newIconElement);
+                if (isDarkMode) { newIconElement.style.color = '#cccccc'; }
+            } else {
+                // Fallback for unexpected dock items (shouldn't happen for the 5 static ones)
+                console.warn(`Could not find Phosphor icon for dock item: ${altText}. Using generic placeholder.`);
+                imageElement.src = `https://placehold.co/48x48/${isDarkMode ? '444444' : 'e0e0e0'}/${isDarkMode ? 'bbbbbb' : '555555'}?text=${encodeURIComponent('No Icon')}`;
+            }
+        }
+
+        // --- Dark Mode Functionality ---
+        function applyDarkModePreference() {
+            const isDarkMode = localStorage.getItem(DARK_MODE_STORAGE_KEY) === 'enabled';
+            document.body.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+            // Re-render recent games and re-apply image error handlers for currently visible images
+            renderRecentGamesDock();
+            document.querySelectorAll('.game-card img').forEach(img => {
+                // Re-trigger error handler for existing images to apply theme
+                // Resetting data-attempt-index to re-run the full fallback logic
+                img.dataset.attemptIndex = '-1';
+                handleGameImageError(img);
+            });
+            // Update phosphor icons in dock for dark mode if they are already rendered
+            document.querySelectorAll('.dock-item .phosphor-icon').forEach(icon => {
+                icon.style.color = isDarkMode ? '#cccccc' : '#4A4A4A';
+            });
+        }
+
+        function toggleDarkMode() {
+            const isDarkMode = document.body.getAttribute('data-theme') === 'dark';
+            if (isDarkMode) {
+                document.body.setAttribute('data-theme', 'light');
+                localStorage.setItem(DARK_MODE_STORAGE_KEY, 'disabled');
+            } else {
+                document.body.setAttribute('data-theme', 'dark');
+                localStorage.setItem(DARK_MODE_STORAGE_KEY, 'enabled');
+            }
+            applyDarkModePreference(); // Re-apply all theme-dependent styles
+        }
+
+        // --- Background Image Functionality ---
+        function applyBackgroundPreference() {
+            const customBg = localStorage.getItem(CUSTOM_BG_STORAGE_KEY);
+            if (customBg) {
+                document.body.style.backgroundImage = `url('${customBg}')`;
+            } else {
+                document.body.style.backgroundImage = `url('bg.png')`; // Default background
+            }
+        }
+
+        function uploadCustomBackground(event) {
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.body.style.backgroundImage = `url('${e.target.result}')`;
+                    localStorage.setItem(CUSTOM_BG_STORAGE_KEY, e.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function resetToDefaultBackground() {
+            document.body.style.backgroundImage = `url('bg.png')`;
+            localStorage.removeItem(CUSTOM_BG_STORAGE_KEY);
+        }
+
+        // --- Local Storage for Recent Games ---
+        function loadRecentGames() {
+            try {
+                const recentGames = JSON.parse(localStorage.getItem(RECENT_GAMES_STORAGE_KEY) || '[]');
+                return recentGames;
+            } catch (e) {
+                console.error("Error loading recent games from localStorage:", e);
+                return [];
+            }
+        }
+
+        function saveRecentGame(gameTitle, gameUrl, gameImageUrl) {
+            let recentGames = loadRecentGames();
+            const newGame = { title: gameTitle, url: gameUrl, imageUrl: gameImageUrl };
+
+            // Remove if already in the list to move it to the top
+            recentGames = recentGames.filter(game => game.url !== newGame.url);
+
+            // Add to the front and limit to MAX_RECENT_GAMES
+            recentGames.unshift(newGame);
+            if (recentGames.length > MAX_RECENT_GAMES) {
+                recentGames = recentGames.slice(0, MAX_RECENT_GAMES);
+            }
+
+            try {
+                localStorage.setItem(RECENT_GAMES_STORAGE_KEY, JSON.stringify(recentGames));
+            } catch (e) {
+                console.error("Error saving recent games to localStorage:", e);
+            }
+            populateRecentGamesDatalist(); // Update the datalist immediately
+            renderRecentGamesDock(); // Update the dock immediately
+        }
+
+        function populateRecentGamesDatalist() {
+            const datalist = document.getElementById('recentGamesList');
+            if (datalist) {
+                datalist.innerHTML = ''; // Clear existing options
+                const recentGames = loadRecentGames();
+                recentGames.forEach(game => {
+                    const option = document.createElement('option');
+                    option.value = game.title;
+                    datalist.appendChild(option);
+                });
+            }
+        }
+
+        function renderRecentGamesDock() {
+            // Define static dock items explicitly by their IDs
+            const staticDockItems = [
+                document.getElementById('launchpadButton'),
+                document.getElementById('settingsButton'),
+                document.getElementById('finderDockItem'),
+                document.getElementById('v4lTextButton'),
+                document.getElementById('v4lPaintButton')
+            ].filter(item => item !== null); // Filter out nulls if an item doesn't exist
+
+            // Get URLs and titles of static items to prevent duplication in recent games
+            const staticItemUrls = new Set(staticDockItems.map(item => item.getAttribute('data-app-url')).filter(url => url));
+            const staticItemTitles = new Set(staticDockItems.map(item => item.querySelector('.label').textContent).filter(title => title));
+
+            // Clear all items from the dock
+            mainDock.innerHTML = '';
+
+            // Re-append static items in the desired order
+            staticDockItems.forEach(item => mainDock.appendChild(item));
+
+            // Append recent games, filtering out any that are already static items
+            const recentGames = loadRecentGames();
+            recentGames.forEach(game => {
+                // Check if the game's URL or title is one of the predefined static app URLs/titles
+                const isStaticApp = staticItemUrls.has(game.url) || staticItemTitles.has(game.title);
+
+                if (!isStaticApp) {
+                    const dockItem = document.createElement('div');
+                    dockItem.classList.add('dock-item');
+                    // The label is now designed to appear on hover, so it's part of the dock-item structure
+                    dockItem.innerHTML = `
+                        <img src="${game.imageUrl}" onerror="handleGameImageError(this)" alt="${game.title} Icon" class="game-icon">
+                        <span class="label">${game.title}</span>
+                    `;
+                    // Reset data-attempt-index for dynamically added images to ensure full fallback logic on reload
+                    dockItem.querySelector('img').dataset.attemptIndex = '-1';
+                    dockItem.addEventListener('click', () => {
+                        openGameInWindow(game.title, game.url);
+                        saveRecentGame(game.title, game.url, game.imageUrl); // Re-save to bring to top
+                    });
+                    mainDock.appendChild(dockItem);
+                }
+            });
+        }
+
+
+        // --- Window Drag and Bring to Front Functionality ---
+        let activeWindow = null; // Stores the currently dragged window element
+        let initialX, initialY; // Mouse position when drag starts
+        let offsetX, offsetY; // Offset from window's top-left to mouse click point
+
+        document.addEventListener('mousedown', (e) => {
+            const clickedWindow = e.target.closest('.os-window');
+            if (clickedWindow) {
+                // Bring the clicked window to the front
+                document.querySelectorAll('.os-window').forEach(win => {
+                    win.style.zIndex = 'auto'; // Reset other windows' z-index
+                });
+                clickedWindow.style.zIndex = '999'; // Set current window to highest z-index
+
+                // Now, check if the click was on the title bar for dragging purposes
+                const titleBar = e.target.closest('.title-bar');
+                const isControlButtonClicked = e.target.closest('.title-bar-button');
+
+                if (titleBar && !isControlButtonClicked) {
+                    activeWindow = clickedWindow;
+                    activeWindow.classList.add('dragging');
+                    initialX = e.clientX;
+                    initialY = e.clientY;
+                    offsetX = initialX - activeWindow.offsetLeft;
+                    offsetY = initialY - activeWindow.offsetTop;
+                }
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (activeWindow) {
+                e.preventDefault(); // Prevent default browser drag behavior
+                let newX = e.clientX - offsetX; // Calculate new window X position
+                let newY = e.clientY - offsetY; // Calculate new window Y position
+
+                // Get dynamic heights of dock and status bar for accurate positioning
+                const dockElement = document.getElementById('mainDock');
+                const statusBarElement = document.getElementById('statusBar');
+                const dockHeight = dockElement ? dockElement.offsetHeight + 15 : 0; // Dock height + its bottom margin
+                const statusBarHeight = statusBarElement ? statusBarElement.offsetHeight + 15 : 0; // Status bar height + its bottom margin
+
+                newX = Math.max(0, Math.min(newX, window.innerWidth - activeWindow.offsetWidth));
+                // Ensure window doesn't overlap with dock or status bar if both are at the bottom
+                const bottomExclusionHeight = Math.max(dockHeight, statusBarHeight);
+                newY = Math.max(0, Math.min(newY, window.innerHeight - activeWindow.offsetHeight - bottomExclusionHeight));
+                newY = Math.max(0, newY); // Ensure it doesn't go above the top of the viewport
+
+                activeWindow.style.left = newX + 'px';
+                activeWindow.style.top = newY + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (activeWindow) {
+                activeWindow.classList.remove('dragging'); // Remove dragging class
+                activeWindow = null; // Reset active window
+            }
+        });
+
+        // --- Launchpad (Start Button) Functionality ---
+        document.getElementById('launchpadButton').addEventListener('click', () => {
+            const gamesWindow = document.getElementById('gamesWindow');
+            gamesWindow.classList.toggle('hidden'); // Toggle the 'hidden' class
+
+            // If the window is now visible, bring it to the front
+            if (!gamesWindow.classList.contains('hidden')) {
+                document.querySelectorAll('.os-window').forEach(win => {
+                    win.style.zIndex = 'auto';
+                });
+                gamesWindow.style.zIndex = '999';
+            }
+        });
+
+        // --- Settings Button Functionality ---
+        document.getElementById('settingsButton').addEventListener('click', () => {
+            const settingsWindow = document.getElementById('settingsWindow');
+            settingsWindow.classList.toggle('hidden');
+            if (!settingsWindow.classList.contains('hidden')) {
+                document.querySelectorAll('.os-window').forEach(win => {
+                    win.style.zIndex = 'auto';
+                });
+                settingsWindow.style.zIndex = '999';
+            }
+        });
+
+        // --- Event Listeners for Settings Window Elements ---
+        document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
+        document.getElementById('bgUploadInput').addEventListener('change', uploadCustomBackground);
+        document.getElementById('resetBgButton').addEventListener('click', resetToDefaultBackground);
+
+
+        // --- General App/Game Click Handler (Open in new OS Window) ---
+        // This handles all clicks that should open a new window (games, V4Ltext, V4LPaint)
+        document.querySelectorAll('.game-card, [data-app-url]').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent default link navigation
+                const isGameCard = item.classList.contains('game-card');
+                const url = isGameCard ? item.href : item.getAttribute('data-app-url');
+                const title = isGameCard ? (item.getAttribute('data-game-title') || item.querySelector('.game-title').textContent) : item.getAttribute('data-app-title');
+                // The imageUrl for recent games in the dock should be derived from the actual game path,
+                // not necessarily from the img.src which might already be a placeholder.
+                // We'll construct it based on the URL.
+                const gamePathSegments = url.split('/');
+                let gameFolder = '';
+                if (gamePathSegments.length >= 3 && gamePathSegments[1] === 'projects') {
+                    gameFolder = gamePathSegments[2]; // e.g., "1v1space" from "/projects/1v1space/index.html"
+                } else if (url === 'text.html') {
+                    gameFolder = 'osico'; // Special case for text.html
+                } else if (url === 'paint.html') {
+                    gameFolder = 'osico'; // Special case for paint.html
+                }
+
+                let imageUrl = '';
+                if (gameFolder === 'osico') {
+                    imageUrl = item.getAttribute('data-app-img'); // For static apps, use their defined image
+                } else {
+                    // For games, default to .jpg, and let the handleGameImageError handle fallbacks
+                    imageUrl = `/projects/${gameFolder}/${gameFolder}.jpg`;
+                }
+
+                openGameInWindow(title, url);
+                saveRecentGame(title, url, imageUrl); // Save to recent games
+            });
+        });
+
+        function openGameInWindow(title, url) {
+            console.log(`Attempting to open window for: ${title} at URL: ${url}`); // Log attempt to open
+
+            // Check if a window for this game already exists
+            const existingWindowId = `appWindow-${title.replace(/\s+/g, '-').replace(/[^\w-]/g, '')}`; // Sanitize ID further
+            let appWindow = document.getElementById(existingWindowId);
+
+            if (!appWindow) {
+                // Create a new window element
+                appWindow = document.createElement('div');
+                appWindow.id = existingWindowId;
+                appWindow.classList.add('os-window');
+                appWindow.setAttribute('data-app-url', url); // Store original URL for maximize button
+                appWindow.setAttribute('data-is-app-window', 'true'); // Flag as an app window (game or text/paint)
+                appWindow.style.width = '80vw'; // Default size for app window
+                appWindow.style.height = '80vh';
+                appWindow.style.left = '10vw';
+                appWindow.style.top = '10vh';
+
+                appWindow.innerHTML = `
+                    <div class="title-bar">
+                        <div class="title-bar-buttons">
+                            <button class="title-bar-button close-button" onclick="closeWindow('${existingWindowId}')"></button>
+                            <button class="title-bar-button minimize-button" onclick="minimizeWindow('${existingWindowId}')"></button>
+                            <button class="title-bar-button maximize-button" onclick="maximizeWindow('${existingWindowId}')"></button>
+                        </div>
+                        <span class="title-text">${title}</span>
+                    </div>
+                    <div class="window-content p-0" style="flex-grow: 1; overflow: hidden; display: flex;">
+                        <iframe src="${url}" style="width: 100%; height: 100%; border: none;"></iframe>
+                    </div>
+                `;
+                dynamicGameWindowsContainer.appendChild(appWindow);
+                console.log(`Successfully created new window for ${title}.`);
+            } else {
+                // If exists, ensure it's visible and bring to front
+                appWindow.classList.remove('hidden');
+                // Reload iframe if needed (optional, for some apps)
+                appWindow.querySelector('iframe').src = url;
+                console.log(`Opened existing window for ${title} and refreshed iframe.`);
+            }
+
+            // Bring the opened app window to the front
+            document.querySelectorAll('.os-window').forEach(win => {
+                win.style.zIndex = 'auto';
+            });
+            appWindow.style.zIndex = '999';
+        }
+
+
+        // --- Game Search Functionality ---
+        function filterGames() {
+            const searchBar = document.getElementById('search-bar');
+            const filter = searchBar.value.toLowerCase(); // Get search input and convert to lowercase
+            const gameCards = document.getElementById('gameCardsContainer').getElementsByClassName('game-card'); // Get all game cards
+
+            // Loop through all game cards and hide/show based on search filter
+            for (let i = 0; i < gameCards.length; i++) {
+                const gameTitle = gameCards[i].querySelector('.game-title'); // Get the title element
+                if (gameTitle) {
+                    // Check if the title text directly includes the filter
+                    const textValue = gameCards[i].getAttribute('data-game-title') || gameTitle.textContent || gameTitle.innerText; // Get the game title text
+                    if (textValue.toLowerCase().includes(filter)) { // Check if title contains filter text
+                        gameCards[i].style.display = ""; // Show the card
+                    } else {
+                        gameCards[i].style.display = "none"; // Hide the card
+                    }
+                }
+            }
+        }
+
+        // --- Window Control Functions (Minimize, Maximize, Close) ---
+        function closeWindow(windowId) {
+            document.getElementById(windowId).classList.add('hidden'); // Simply hide the window
+            console.log(`Window ${windowId} closed.`);
+        }
+
+        function minimizeWindow(windowId) {
+            // For a true OS, this would send the window to the dock.
+            // For this simulation, it just hides the window.
+            document.getElementById(windowId).classList.add('hidden');
+            console.log(`Window ${windowId} minimized.`);
+        }
+
+        function maximizeWindow(windowId) {
+            const windowElement = document.getElementById(windowId);
+            const isAppWindow = windowElement.getAttribute('data-is-app-window') === 'true';
+
+            if (isAppWindow) {
+                // For app windows, green button opens the content in a new tab
+                const appUrl = windowElement.getAttribute('data-app-url');
+                if (appUrl) {
+                    window.open(appUrl, '_blank'); // Open in new tab
+                    console.log(`App ${windowId} maximized to new tab: ${appUrl}`);
+                    // Optionally, close the internal window after opening in a new tab
+                    closeWindow(windowId);
+                } else {
+                    console.warn(`Attempted to maximize app ${windowId}, but data-app-url is missing.`);
+                }
+            } else {
+                // For other windows (like Welcome, Games list, Settings), perform internal maximize/restore
+                if (!windowStates[windowId]) {
+                    // If not maximized, store its current position and size
+                    windowStates[windowId] = {
+                        left: windowElement.style.left,
+                        top: windowElement.style.top,
+                        width: windowElement.style.width,
+                        height: windowElement.style.height,
+                        borderRadius: windowElement.style.borderRadius // Store border-radius
+                    };
+                    // Maximize the window to full screen (accounting for dock and status bar heights)
+                    const dockHeight = mainDock.offsetHeight + 30; // Approximate dock height + margin
+                    const statusBarHeight = document.getElementById('statusBar').offsetHeight + 30; // Approx status bar height + margin
+                    const bottomExclusionHeight = Math.max(dockHeight, statusBarHeight);
+
+                    windowElement.style.left = '0';
+                    windowElement.style.top = '0';
+                    windowElement.style.width = '100vw';
+                    windowElement.style.height = `calc(100vh - ${bottomExclusionHeight}px)`; /* Full height minus largest bottom bar */
+                    windowElement.style.borderRadius = '0'; /* Remove rounded corners when maximized */
+                    console.log(`Window ${windowId} maximized.`);
+                } else {
+                    // If already maximized, restore it to its previous state
+                    const prevState = windowStates[windowId];
+                    windowElement.style.left = prevState.left;
+                    windowElement.style.top = prevState.top;
+                    windowElement.style.width = prevState.width;
+                    windowElement.style.height = prevState.height;
+                    windowElement.style.borderRadius = prevState.borderRadius; /* Restore rounded corners */
+                    delete windowStates[windowId]; // Clear the stored state
+                    console.log(`Window ${windowId} restored.`);
+                }
+            }
+        }
+
+        // --- Status Bar Time/Date Update ---
+        function updateDateTime() {
+            const now = new Date();
+            const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+            const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', timeOptions);
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', dateOptions);
+        }
+
+        // Initialize on page load
+        window.onload = () => {
+            applyDarkModePreference(); // Apply dark mode on load
+            applyBackgroundPreference(); // Apply custom background on load
+            populateRecentGamesDatalist(); // Populate datalist on load
+            renderRecentGamesDock(); // Render recent games in the dock
+            updateDateTime(); // Initial update of time/date
+            setInterval(updateDateTime, 1000); // Update time every second
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Console Launcher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #180521, #400147, #6B007C, #8C0099, #D000D0);
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .game-carousel::-webkit-scrollbar {
+            height: 8px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .game-carousel::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.4);
+            border-radius: 4px;
+        }
+
+        .game-carousel::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(255, 255, 255, 0.6);
+        }
+
+        .top-bar {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(5px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100;
+        }
+
+        .featured-game-container {
+            position: relative;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .featured-game-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            filter: brightness(0.5) blur(8px);
+            transform: scale(1.05);
+            transition: transform 0.3s ease-out;
+            z-index: 0;
+        }
+
+        .featured-game-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: flex-end;
+            max-width: 1200px;
+            width: 100%;
+            padding: 0 2rem 2rem 2rem;
+            box-sizing: border-box;
+            height: 100%;
+            padding-top: 10rem;
+        }
+        @media (max-width: 768px) {
+            .featured-game-content {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                padding-bottom: 5rem;
+                padding-top: 5rem;
+            }
+            .featured-game-thumbnail {
+                margin-right: 0;
+                margin-bottom: 1.5rem;
+            }
+        }
+
+        .featured-game-thumbnail {
+            width: 300px;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            margin-right: 3rem;
+            transition: transform 0.2s ease-out;
+            cursor: pointer;
+            z-index: 2;
+        }
+        .featured-game-thumbnail:hover {
+            transform: scale(1.02);
+        }
+
+        .featured-game-info {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding-bottom: 1rem;
+            padding-left: 0.5rem;
+        }
+
+        .featured-game-info h2 {
+            font-size: 3.2rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 0.25rem;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
+            white-space: nowrap;
+        }
+        .featured-game-info p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 0;
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        .game-carousel-wrapper {
+            padding: 1rem 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            width: 100%;
+            z-index: 50;
+            flex-shrink: 0;
+        }
+
+        .game-carousel {
+            display: flex;
+            gap: 1.5rem;
+            padding: 0 2rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x mandatory;
+        }
+
+        .game-card {
+            flex: 0 0 180px;
+            scroll-snap-align: start;
+            border-radius: 8px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+            cursor: pointer;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: #fff;
+            position: relative;
+        }
+        .game-card:hover, .game-card.highlighted {
+            transform: translateY(-8px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        .game-card img {
+            width: 100%;
+            height: 240px;
+            object-fit: cover;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .game-card-title {
+            padding: 0.75rem 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .new-to-library-tag {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            background-color: #007bff;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        .bottom-nav {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(5px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.75rem 2rem;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+        .bottom-nav-button {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            font-weight: 600;
+            transition: background 0.2s ease-in-out;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #fff;
+            text-decoration: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .bottom-nav-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .bottom-nav-button .button-label {
+            font-size: 0.8rem;
+            font-weight: normal;
+            opacity: 0.9;
+        }
+        .bottom-nav-button.primary-action {
+            background: linear-gradient(to right, #007bff, #0056b3);
+            border-color: #007bff;
+        }
+        .bottom-nav-button.primary-action:hover {
+            background: linear-gradient(to right, #0056b3, #007bff);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <header class="top-bar flex justify-between items-center px-6 py-3 text-sm">
+        <div class="flex items-center space-x-2">
+            <span class="text-xl">🎮</span>
+            <span>60</span>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-xl">🔍</span>
+            <img src="https://placehold.co/24x24/000000/FFFFFF?text=🎮" alt="Controller" class="w-6 h-6 opacity-80" onerror="this.src='https://placehold.co/24x24/000000/FFFFFF?text=🎮'">
+            <span class="text-xl">73 %</span>
+            <span class="ml-1 text-green-400">🔋</span>
+            <span id="currentTime" class="font-bold"></span>
+            <img src="https://placehold.co/32x32/808080/FFFFFF?text=👤" alt="Profile" class="w-8 h-8 rounded-full border border-white" onerror="this.src='https://placehold.co/32x32/808080/FFFFFF?text=👤'">
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col justify-center items-center relative overflow-hidden">
+        <div id="featuredGameBackground" class="featured-game-bg"></div>
+        <div class="featured-game-content">
+            <img id="featuredGameThumbnail" src="" alt="Featured Game Thumbnail" class="featured-game-thumbnail">
+            <div class="featured-game-info flex flex-col justify-center items-start">
+                <h2 id="featuredGameTitle"></h2>
+                <p id="featuredGameSubtitle"></p>
+            </div>
+        </div>
+    </main>
+
+    <section class="game-carousel-wrapper">
+        <div id="gameCarousel" class="game-carousel">
+        </div>
+    </section>
+
+    <footer class="bottom-nav flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+            <a href="#" class="bottom-nav-button">
+                <span class="text-lg">🎮</span>
+                <span class="button-label">Vox4l</span>
+            </a>
+            <a href="#" class="bottom-nav-button">
+                <span class="text-lg">☰</span>
+                <span class="button-label">MENU</span>
+            </a>
+        </div>
+        <div class="flex items-center space-x-4">
+            <a href="#" class="bottom-nav-button">
+                <span class="text-lg">⟷</span>
+                <span class="button-label">OPTIONS</span>
+            </a>
+            <a href="#" id="aSelectButton" class="bottom-nav-button primary-action">
+                <span class="text-lg">Ⓐ</span>
+                <span class="button-label">SELECT</span>
+            </a>
+            <a href="#" class="bottom-nav-button">
+                <span class="text-lg">Ⓑ</span>
+                <span class="button-label">BACK</span>
+            </a>
+        </div>
+    </footer>
+
+    <script>
+        const gameNames = [
+            "1", "1v1space", "2048", "8ball", "9007199254740992", "BTD4", "Bitlife", "Bloxorz",
+            "Chess", "DogeMiner", "Henrystickman", "HexGL", "L2F2", "L2F3", "Minecraft", "OT",
+            "PE", "SandboxelsOLD", "Subway", "TIOachievementunlocked", "adrenalinechallenge",
+            "among-us", "avalanche", "backrooms", "basketball-stars", "battleforgondor",
+            "bigredbutton", "blackknight", "bloonstd", "bloonstd2", "bloxors", "boxhead2play",
+            "breakingthebank", "btts", "cannon-basketball-4", "canyondefense", "cattle3d",
+            "cell-machine", "championarcher", "chrome-dino", "circlo", "connect3", "cookie-clicker",
+            "craftmine", "creativekillchamber", "csgo-clicker", "ctr", "ctr-holiday", "ctr-tr",
+            "cubefield", "cupcake2048", "deal-or-no-deal", "death-run-3d", "defend-the-tank",
+            "doge2048", "doodle-jump", "doom", "doublewires", "draw-the-hill", "ducklife1",
+            "ducklife2", "ducklife3", "edgenotfound", "elasticman", "endlesswar3", "evil-glitch",
+            "exo", "factoryballs", "fake-virus", "flappy-2048", "flappy-bird", "flashtetris",
+            "game-inside", "geodash", "getaway-shootout", "gimme-the-airpod", "glass-city",
+            "google-snake", "grindcraft", "hackertype", "hba", "helicopter", "hexempire",
+            "hextris", "idle-breakout", "idle-shark", "impossiblequiz", "interactivebuddy",
+            "just-one-boss", "kittencannon", "krunker", "learntofly", "mario", "matrixrampage",
+            "meme2048", "minecraft-classic", "minesweeper", "miniputt", "missiles", "motox3m",
+            "motox3m-pool", "motox3m-spooky", "motox3m-winter", "n-gon", "ns-shaft", "om-bounce",
+            "pandemic2", "papaspizzaria", "paperio2", "papery-planes", "particle-clicker",
+            "polybranch", "portalflash", "push-the-square", "push-your-luck", "retro-bowl", "rh",
+            "rolly-vortex", "rooftop-snipers", "sand-game", "sandboxelsslope", "sm64", "sm64-main",
+            "smashkarts", "smokingbarrels", "snowbattle", "soldier-legend", "solitaire",
+            "sort-the-court", "soundboard", "stack", "stack-bump-3d", "stealingthediamond",
+            "stickwar", "stormthehouse2", "superhot", "swerve", "tacticalassasin2", "tank-trouble-2",
+            "tanuki-sunset", "temple-run-2", "the-final-earth", "thebattle", "theheist",
+            "there-is-no-game", "thisistheonlylevel", "tosstheturtle", "tube-jumpers",
+            "tunnel-rush", "tv-static", "vex3", "vex4", "vex5", "vex6", "webretro", "webretro-local", "wolf3d",
+            "wordle", "worlds-hardest-game", "you-are-bezos"
+        ];
+
+        function formatGameNameForDisplay(gameName) {
+            return gameName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function getGameIconPath(gameName, extension = '.png') {
+            return `projects/${gameName}/${gameName}${extension}`;
+        }
+
+        let selectedGameName = null;
+        let highlightedGameIndex = -1;
+
+        function setFeaturedGame(gameName) {
+            selectedGameName = gameName;
+            const formattedTitle = formatGameNameForDisplay(gameName);
+
+            const featuredGameBg = document.getElementById('featuredGameBackground');
+            const featuredGameThumbnail = document.getElementById('featuredGameThumbnail');
+            const featuredGameTitle = document.getElementById('featuredGameTitle');
+            const featuredGameSubtitle = document.getElementById('featuredGameSubtitle');
+
+            if (gameName.toLowerCase() === 'need for speed heat') {
+                featuredGameBg.style.backgroundImage = `url('https://placehold.co/1920x1080/000000/00FFFF?text=NFS+Heat+Car+Background')`;
+                featuredGameBg.dataset.fallbackTriedBgJpg = 'true';
+            } else {
+                featuredGameBg.style.backgroundImage = `url('${getGameIconPath(gameName, '.png')}')`;
+                featuredGameBg.dataset.fallbackTriedBgJpg = '';
+            }
+            
+            featuredGameThumbnail.src = getGameIconPath(gameName, '.png');
+
+            featuredGameBg.onerror = function() {
+                if (!this.dataset.fallbackTriedBgJpg) {
+                    this.style.backgroundImage = `url('${getGameIconPath(gameName, '.jpg')}')`;
+                    this.dataset.fallbackTriedBgJpg = 'true';
+                } else {
+                    this.style.backgroundImage = `url('https://placehold.co/1920x1080/4a0050/a500b8?text=FEATURED+GAME')`;
+                    this.onerror = null;
+                }
+            };
+
+            featuredGameThumbnail.onerror = function() {
+                if (!this.dataset.fallbackTriedThumbJpg) {
+                    this.src = getGameIconPath(gameName, '.jpg');
+                    this.dataset.fallbackTriedThumbJpg = 'true';
+                } else {
+                    this.src = `https://placehold.co/250x330/008080/FFFFFF?text=${formattedTitle.split(' ').slice(0,2).join('+')}`;
+                    this.onerror = null;
+                }
+            };
+
+            featuredGameTitle.textContent = formattedTitle;
+            featuredGameSubtitle.textContent = "II LAST TWO WEEKS 22 MIN";
+        }
+
+        function populateGameCarousel() {
+            const gameCarouselContainer = document.getElementById('gameCarousel');
+            gameCarouselContainer.innerHTML = '';
+
+            gameNames.forEach((gameName, index) => {
+                const gameCard = document.createElement('a');
+                gameCard.href = "#";
+                gameCard.classList.add('game-card');
+                gameCard.target = "_self";
+                gameCard.rel = "noopener noreferrer";
+                gameCard.dataset.gameName = gameName;
+                gameCard.dataset.index = index;
+
+                const img = document.createElement('img');
+                img.src = getGameIconPath(gameName, '.png');
+                img.alt = formatGameNameForDisplay(gameName);
+                img.onerror = function() {
+                    if (!this.dataset.fallbackTriedJpg) {
+                        this.src = getGameIconPath(gameName, '.jpg');
+                        this.dataset.fallbackTriedJpg = 'true';
+                    } else {
+                        this.src = `https://placehold.co/180x240/1f012b/fff?text=${formatGameNameForDisplay(gameName).split(' ').slice(0,2).join('+')}`;
+                        this.onerror = null;
+                    }
+                };
+                gameCard.appendChild(img);
+
+                const titleDiv = document.createElement('div');
+                titleDiv.classList.add('game-card-title');
+                titleDiv.textContent = formatGameNameForDisplay(gameName);
+                gameCard.appendChild(titleDiv);
+
+                if (gameName.toLowerCase() === 'batman') {
+                    const newTag = document.createElement('span');
+                    newTag.classList.add('new-to-library-tag');
+                    newTag.textContent = 'NEW TO LIBRARY';
+                    gameCard.appendChild(newTag);
+                }
+
+                gameCard.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    highlightGameCard(index);
+                });
+
+                gameCarouselContainer.appendChild(gameCard);
+            });
+
+            const initialFeaturedGame = "webretro"; // Set initial featured game to "webretro"
+            let initialSelectedGameIndex = gameNames.findIndex(name => name.toLowerCase() === initialFeaturedGame.toLowerCase());
+            if (initialSelectedGameIndex === -1) {
+                initialSelectedGameIndex = Math.floor(Math.random() * gameNames.length);
+            }
+            highlightGameCard(initialSelectedGameIndex);
+        }
+
+        function highlightGameCard(index) {
+            const gameCards = document.querySelectorAll('.game-card');
+            if (index < 0) {
+                index = gameCards.length - 1; // Wrap around to the end
+            } else if (index >= gameCards.length) {
+                index = 0; // Wrap around to the beginning
+            }
+
+            if (highlightedGameIndex !== -1 && gameCards[highlightedGameIndex]) {
+                gameCards[highlightedGameIndex].classList.remove('highlighted');
+            }
+
+            gameCards[index].classList.add('highlighted');
+            highlightedGameIndex = index;
+
+            setFeaturedGame(gameNames[index]);
+
+            gameCards[index].scrollIntoView({ behavior: 'smooth', inline: 'center' });
+        }
+
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = now.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
+            const timeString = `${hours}:${formattedMinutes} ${ampm}`;
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        window.onload = function() {
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            populateGameCarousel();
+
+            const aSelectButton = document.getElementById('aSelectButton');
+            aSelectButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (selectedGameName) {
+                    window.location.href = `projects/${selectedGameName}/index.html`;
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                const gameCards = document.querySelectorAll('.game-card');
+                if (gameCards.length === 0) return;
+
+                switch (e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        highlightGameCard(highlightedGameIndex - 1);
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        highlightGameCard(highlightedGameIndex + 1);
+                        break;
+                    case 'Enter':
+                        e.preventDefault();
+                        if (selectedGameName) {
+                            window.location.href = `projects/${selectedGameName}/index.html`;
+                        }
+                        break;
+                }
+            });
+        };
+    </script>
+</body>
+</html>

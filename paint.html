@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Paint Program</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent scrolling */
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f0f4f8; /* Light background */
+            color: #334155;
+        }
+
+        /* Top Bar styling for glass effect */
+        #topBar {
+            background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent white */
+            backdrop-filter: blur(10px); /* Frosted glass effect */
+            -webkit-backdrop-filter: blur(10px); /* Safari compatibility */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Soft shadow */
+            padding: 0.75rem 1.5rem; /* Adjusted padding for more compact look */
+            border-bottom-left-radius: 1rem;
+            border-bottom-right-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+            gap: 1rem; /* Spacing between sections */
+            flex-shrink: 0; /* Prevent top bar from shrinking */
+            z-index: 50; /* Ensure top bar is above main content but below modals/dropdowns */
+        }
+
+        /* Container for main content (layers panel + canvas) */
+        .main-content-area {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden; /* Ensure content within is clipped */
+        }
+
+        /* Tool and Layer Panels */
+        .panel {
+            background-color: rgba(255, 255, 255, 0.7); /* Consistent glass effect */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 1.5rem;
+            border-radius: 0.75rem; /* Rounded corners */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); /* Softer shadow */
+            margin: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto; /* Scroll for many layers/tools */
+            flex-shrink: 0;
+            z-index: 10; /* Ensure panels are above canvas */
+        }
+
+        .layers-panel {
+            width: 200px; /* Fixed width for layers */
+            /* Account for top bar height and margins */
+            max-height: calc(100vh - 2rem - var(--top-bar-height, 64px));
+        }
+
+        /* Canvas Container */
+        .canvas-container {
+            flex-grow: 1;
+            position: relative;
+            /* Background color will be set dynamically via JS for the base canvas */
+            background-color: #e2e8f0; /* Fallback/initial background */
+            border-radius: 0.75rem;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+            margin: 1rem 0; /* Adjust margin to align with panels */
+            overflow: hidden; /* Clip content at boundaries */
+            z-index: 5; /* Below panels */
+        }
+
+        /* All canvases must be absolute and fill the container */
+        .canvas-container canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            /* width and height are set in JS to control actual resolution */
+            touch-action: none; /* Prevent browser default touch actions like scrolling */
+            image-rendering: pixelated; /* For sharper low-res scaling */
+            image-rendering: crisp-edges; /* For sharper low-res scaling */
+        }
+
+        /* Specific styles for selection overlay to be on top */
+        #selectionOverlayCanvas {
+            z-index: 999; /* Always on top of drawing layers */
+            pointer-events: none; /* Allows clicks to pass through to underlying layers */
+        }
+
+        /* Tool Buttons - now more translucent */
+        .tool-button, .hamburger-menu-btn { /* Apply same style to hamburger button */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1rem;
+            background-color: rgba(255, 255, 255, 0.4); /* Translucent white */
+            backdrop-filter: blur(5px); /* Light blur */
+            -webkit-backdrop-filter: blur(5px);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            font-weight: 500;
+            color: #334155; /* Darker text for contrast */
+            white-space: nowrap; /* Prevent button text from wrapping */
+            border: 1px solid rgba(255, 255, 255, 0.2); /* Subtle border */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .tool-button:hover, .hamburger-menu-btn:hover {
+            background-color: rgba(255, 255, 255, 0.6); /* Slightly less translucent on hover */
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .tool-button.active {
+            background-color: #3b82f6; /* Blue for active tool */
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+            transform: translateY(-1px);
+            border-color: #3b82f6; /* Active border color */
+        }
+
+        /* Sliders */
+        input[type="range"] {
+            width: 120px; /* Compact width for top bar */
+            -webkit-appearance: none; /* Remove default styling */
+            appearance: none;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.3); /* Translucent track */
+            outline: none;
+            border-radius: 4px;
+            margin: 0 0.5rem; /* Adjust margin for horizontal layout */
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05); /* Subtle inner shadow */
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #3b82f6;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #3b82f6;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Color picker */
+        input[type="color"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            border: none;
+            width: 40px; /* Smaller for top bar */
+            height: 30px; /* Smaller for top bar */
+            background: none;
+            cursor: pointer;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2); /* Subtle border */
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 0.5rem;
+        }
+        input[type="color"]::-moz-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-moz-color-swatch {
+            border: none;
+            border-radius: 0.5rem;
+        }
+
+        /* Label for sliders and color picker in top bar */
+        .top-bar-control-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 500; /* font-medium */
+            color: #475569;
+        }
+        .top-bar-control-group span { /* value display */
+            min-width: 25px;
+            text-align: right;
+        }
+
+        /* For stacking color pickers */
+        .color-pickers-stacked {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem; /* Space between the two color picker groups */
+        }
+
+        /* Dropdown Menu for File Operations */
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 10px); /* Position below the button */
+            right: 0; /* Align to the right of the button */
+            background-color: rgba(255, 255, 255, 0.9); /* More opaque glass */
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            padding: 0.75rem;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            gap: 0.5rem;
+            z-index: 1001; /* Ensure it's above everything */
+            min-width: 150px; /* Ensure buttons fit */
+            transform-origin: top right;
+            animation: growIn 0.2s ease-out forwards;
+            border: 1px solid rgba(255, 255, 255, 0.3); /* Subtle border */
+        }
+        .dropdown-menu.show {
+            display: flex;
+        }
+        .dropdown-menu .tool-button {
+            width: 100%; /* Full width within dropdown */
+            text-align: left;
+            justify-content: flex-start;
+        }
+        @keyframes growIn {
+            from { opacity: 0; transform: scale(0.9) translateY(-5px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* Layer List */
+        .layer-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            flex-grow: 1; /* Allow list to grow */
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            background-color: rgba(255, 255, 255, 0.4); /* Translucent layer item */
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+            color: #334155; /* Ensure text color is consistent */
+        }
+
+        .layer-item:hover {
+            background-color: rgba(255, 255, 255, 0.6);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        }
+
+        .layer-item.active-layer {
+            background-color: #3b82f6;
+            color: #ffffff;
+            font-weight: 700;
+            border-color: #3b82f6;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+        }
+
+        .layer-item span {
+            flex-grow: 1;
+        }
+
+        /* Layer controls buttons (Add/Remove Layer) - now translucent */
+        .layer-controls button {
+            background-color: rgba(255, 255, 255, 0.4); /* Translucent white */
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #334155; /* Dark text for contrast */
+            padding: 0.6rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s, transform 0.1s;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .layer-controls button:hover {
+            background-color: rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+            transform: translateY(-1px);
+        }
+
+        /* Modal specific styles */
+        .modal-content {
+            background-color: rgba(255, 255, 255, 0.9); /* More opaque glass for modals */
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+            text-align: center;
+            max-width: 450px;
+            width: 90%;
+            animation: fadeIn 0.3s ease-out;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .modal-input-group input[type="number"] {
+            background-color: rgba(255, 255, 255, 0.7); /* Translucent input background */
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+            color: #334155; /* Ensure input text is readable */
+        }
+
+        .modal-input-group input[type="number"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .modal-buttons button {
+            background-color: rgba(255, 255, 255, 0.4); /* Translucent buttons in modal */
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #334155;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s, transform 0.1s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .modal-buttons button:hover {
+            background-color: rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .modal-buttons #exportConfirmBtn, .modal-buttons #confirmYes, .modal-buttons #confirmOk, .modal-buttons #resizeConfirmBtn {
+             background-color: #3b82f6; /* Keep primary action buttons blue */
+             color: white;
+             border-color: #3b82f6;
+        }
+        .modal-buttons #exportConfirmBtn:hover, .modal-buttons #confirmYes:hover, .modal-buttons #confirmOk:hover, .modal-buttons #resizeConfirmBtn:hover {
+            background-color: #2563eb;
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Fade-in animation for modals */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            #topBar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.5rem;
+                padding: 0.75rem 1rem;
+            }
+
+            .top-bar-section {
+                flex-direction: column;
+                align-items: stretch;
+                width: 100%;
+            }
+
+            .top-bar-section.tools .grid {
+                grid-template-columns: repeat(3, 1fr); /* 3 tool buttons per row */
+            }
+
+            .top-bar-control-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            input[type="range"] {
+                width: 100%; /* Full width for sliders */
+                margin: 0.25rem 0;
+            }
+
+            .main-content-area {
+                flex-direction: column;
+            }
+
+            .layers-panel {
+                width: auto; /* Auto width on smaller screens */
+                max-height: none;
+                margin: 0.5rem;
+                padding: 1rem;
+                flex-direction: row; /* Horizontal layout for layers panel */
+                flex-wrap: wrap; /* Allow layers to wrap */
+                justify-content: center;
+            }
+
+            .layers-panel .layer-list {
+                flex-direction: row; /* Horizontal layer list */
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 0.25rem; /* Tighter gap */
+            }
+
+            .layers-panel .layer-item {
+                flex-basis: calc(50% - 0.25rem); /* 2 layers per row */
+                padding: 0.4rem 0.6rem;
+                font-size: 0.875rem;
+            }
+
+            .layers-panel .layer-controls {
+                flex-direction: row; /* Horizontal layer controls */
+            }
+
+            .canvas-container {
+                margin: 0.5rem;
+                flex-grow: 1; /* Allow canvas to take available space */
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-700">
+    <!-- Top Bar -->
+    <div id="topBar">
+        <!-- Main Tools -->
+        <div class="top-bar-section tools flex-wrap flex items-center gap-2">
+            <button id="brushTool" class="tool-button active">Brush</button>
+            <button id="eraseTool" class="tool-button">Erase</button>
+            <button id="fillTool" class="tool-button">Fill</button>
+            <button id="selectTool" class="tool-button">Select</button>
+        </div>
+
+        <!-- Tool Settings (Sliders, Color, Background Color) -->
+        <div class="top-bar-section settings flex-wrap flex items-center gap-2">
+            <div class="top-bar-control-group">
+                <label for="brushSize">Brush Size:</label>
+                <input type="range" id="brushSize" min="1" max="50" value="5">
+                <span id="brushSizeValue">5</span>
+            </div>
+
+            <div class="top-bar-control-group">
+                <label for="eraseSize">Erase Size:</label>
+                <input type="range" id="eraseSize" min="1" max="100" value="10">
+                <span id="eraseSizeValue">10</span>
+            </div>
+
+            <div class="top-bar-control-group">
+                <label for="opacity">Opacity:</label>
+                <input type="range" id="opacity" min="0" max="100" value="100">
+                <span id="opacityValue">100%</span>
+            </div>
+
+            <!-- Stacked Color Pickers -->
+            <div class="color-pickers-stacked">
+                <div class="top-bar-control-group">
+                    <label for="colorPicker">Color:</label>
+                    <input type="color" id="colorPicker" value="#000000">
+                </div>
+
+                <div class="top-bar-control-group">
+                    <label for="bgColorPicker">BG Color:</label>
+                    <input type="color" id="bgColorPicker" value="#FFFFFF">
+                </div>
+            </div>
+        </div>
+
+        <!-- Hamburger Menu for File Operations -->
+        <div class="relative top-bar-section file-ops">
+            <button id="hamburgerMenuBtn" class="hamburger-menu-btn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div id="fileOpsDropdown" class="dropdown-menu">
+                <button id="newImageBtn" class="tool-button">New</button>
+                <button id="resizeImageBtn" class="tool-button">Resize</button>
+                <button id="importImageBtn" class="tool-button">Import</button>
+                <button id="exportImageBtn" class="tool-button">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content-area">
+        <!-- Canvas Container -->
+        <div class="canvas-container" id="canvasContainer">
+            <!-- Background canvas will be the first child -->
+            <canvas id="backgroundCanvas"></canvas>
+            <!-- Other layers will be dynamically added here -->
+            <canvas id="selectionOverlayCanvas"></canvas>
+        </div>
+
+        <!-- Layers Panel -->
+        <div class="panel layers-panel">
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Layers</h2>
+            <div id="layerList" class="layer-list">
+                <!-- Layers will be dynamically added here -->
+            </div>
+            <div class="layer-controls">
+                <button id="addLayerBtn">Add Layer</button>
+                <button id="removeLayerBtn">Remove Layer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden input for file import -->
+    <input type="file" id="imageInput" accept="image/png, image/jpeg" style="display:none;">
+    <!-- Hidden link for file export -->
+    <a id="downloadLink" style="display:none;"></a>
+
+    <script>
+        // Global variables for canvas and tools
+        const canvasContainer = document.getElementById('canvasContainer');
+        const selectionOverlayCanvas = document.getElementById('selectionOverlayCanvas');
+        const selectionOverlayCtx = selectionOverlayCanvas.getContext('2d');
+        const backgroundCanvas = document.getElementById('backgroundCanvas');
+        const backgroundCtx = backgroundCanvas.getContext('2d');
+
+        let layers = []; // Stores user-created drawing layers
+        let activeLayerIndex = -1; // Index of the currently active drawing layer
+        let isDrawing = false;
+        let isSelecting = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentTool = 'brush'; // Default tool
+
+        let brushSize = 5;
+        let eraseSize = 10;
+        let currentColor = '#000000'; // Current drawing color
+        let currentOpacity = 1.0; // Current drawing opacity (0.0 to 1.0)
+        let backgroundColor = '#FFFFFF'; // Current background color
+
+        let selection = null; // { x1, y1, x2, y2, width, height } for selection tool
+
+        // UI elements
+        const brushToolBtn = document.getElementById('brushTool');
+        const eraseToolBtn = document.getElementById('eraseTool');
+        const fillToolBtn = document.getElementById('fillTool');
+        const selectToolBtn = document.getElementById('selectTool');
+        const toolButtons = document.querySelectorAll('.tool-button'); // All tool buttons for active state management
+
+        const brushSizeSlider = document.getElementById('brushSize');
+        const brushSizeValueSpan = document.getElementById('brushSizeValue');
+        const eraseSizeSlider = document.getElementById('eraseSize');
+        const eraseSizeValueSpan = document.getElementById('eraseSizeValue');
+        const opacitySlider = document.getElementById('opacity');
+        const opacityValueSpan = document.getElementById('opacityValue');
+        const colorPicker = document.getElementById('colorPicker');
+        const bgColorPicker = document.getElementById('bgColorPicker'); // New background color picker
+
+        const hamburgerMenuBtn = document.getElementById('hamburgerMenuBtn');
+        const fileOpsDropdown = document.getElementById('fileOpsDropdown');
+        const newImageBtn = document.getElementById('newImageBtn');
+        const resizeImageBtn = document.getElementById('resizeImageBtn');
+        const importImageBtn = document.getElementById('importImageBtn');
+        const exportImageBtn = document.getElementById('exportImageBtn');
+
+        const layerListDiv = document.getElementById('layerList');
+        const addLayerBtn = document.getElementById('addLayerBtn');
+        const removeLayerBtn = document.getElementById('removeLayerBtn');
+
+        const imageInput = document.getElementById('imageInput');
+        const downloadLink = document.getElementById('downloadLink');
+
+        // Store the actual canvas resolution, separate from display size
+        let canvasResolution = { width: 800, height: 600 }; // Default initial resolution
+
+        /**
+         * Sets the internal resolution (width/height attributes) for all canvases
+         * including the background and selection overlay.
+         * This function should be called when the logical resolution of the image changes.
+         */
+        function setAllCanvasResolutions(width, height) {
+            canvasResolution.width = width;
+            canvasResolution.height = height;
+
+            backgroundCanvas.width = width;
+            backgroundCanvas.height = height;
+            // Fill background canvas with current background color
+            backgroundCtx.fillStyle = backgroundColor;
+            backgroundCtx.fillRect(0, 0, width, height);
+
+            selectionOverlayCanvas.width = width;
+            selectionOverlayCanvas.height = height;
+
+            layers.forEach(layer => {
+                // If existing content needs to be preserved during resize,
+                // you would draw the old content onto a temporary canvas of new size
+                // then copy back. For simplicity here, resizing clears the content.
+                // A better approach would be to save image data before changing width/height
+                // then redraw it onto the new canvas.
+                layer.canvas.width = width;
+                layer.canvas.height = height;
+            });
+            // Reapply current context settings for active layer
+            if (activeLayerIndex !== -1) {
+                applyContextSettings(layers[activeLayerIndex].context);
+            }
+        }
+
+        /**
+         * Initializes the canvas display dimensions (CSS style.width/height) to fill the container.
+         * This function should be called initially and on window resize.
+         */
+        function initializeCanvasDisplayDimensions() {
+            // Set display size of all canvases to match container for responsive scaling
+            backgroundCanvas.style.width = '100%';
+            backgroundCanvas.style.height = '100%';
+            selectionOverlayCanvas.style.width = '100%';
+            selectionOverlayCanvas.style.height = '100%';
+
+            layers.forEach(layer => {
+                layer.canvas.style.width = '100%';
+                layer.canvas.style.height = '100%';
+            });
+        }
+
+
+        /**
+         * Adds a new drawing layer to the application.
+         * Each layer consists of a canvas element and its 2D rendering context.
+         * The new layer is added to the `layers` array and becomes the active layer.
+         * The internal resolution of the new layer's canvas is set by `canvasResolution`.
+         */
+        function addLayer() {
+            const newCanvas = document.createElement('canvas');
+            const layerId = `layer-${Date.now()}`;
+            newCanvas.id = layerId;
+            newCanvas.className = 'absolute top-0 left-0';
+            // Adjust z-index relative to other drawing layers and background/overlay
+            newCanvas.style.zIndex = layers.length + 1; // +1 to be above background, +0 for selection overlay
+
+            // Set the internal resolution of the new canvas
+            newCanvas.width = canvasResolution.width;
+            newCanvas.height = canvasResolution.height;
+
+            const newCtx = newCanvas.getContext('2d');
+            newCtx.lineCap = 'round';
+            newCtx.lineJoin = 'round';
+            applyContextSettings(newCtx);
+
+            // Insert new layer before the selection overlay canvas
+            canvasContainer.insertBefore(newCanvas, selectionOverlayCanvas);
+
+            layers.push({
+                id: layerId,
+                canvas: newCanvas,
+                context: newCtx,
+                name: `Layer ${layers.length + 1}` // Layers are 0-indexed internally, but name starts from 1
+            });
+
+            selectLayer(layers.length - 1);
+            initializeCanvasDisplayDimensions(); // Update display sizes (CSS)
+        }
+
+        /**
+         * Selects a layer by its index, making it the active layer for drawing.
+         * Updates the UI to highlight the active layer.
+         * @param {number} index - The index of the layer to select.
+         */
+        function selectLayer(index) {
+            if (index < 0 || index >= layers.length) return;
+
+            // Remove 'active-layer' class from the previously active layer
+            if (activeLayerIndex !== -1 && layers[activeLayerIndex]) {
+                const prevLayerItem = document.querySelector(`.layer-item[data-index="${activeLayerIndex}"]`);
+                if (prevLayerItem) {
+                    prevLayerItem.classList.remove('active-layer');
+                }
+            }
+
+            activeLayerIndex = index;
+
+            // Add 'active-layer' class to the newly active layer's UI item
+            const newLayerItem = document.querySelector(`.layer-item[data-index="${activeLayerIndex}"]`);
+            if (newLayerItem) {
+                newLayerItem.classList.add('active-layer');
+            }
+
+            // Ensure the context settings reflect current tool properties on the new active layer
+            if (activeLayerIndex !== -1) {
+                const activeCtx = layers[activeLayerIndex].context;
+                applyContextSettings(activeCtx);
+            }
+
+            renderLayerList();
+        }
+
+        /**
+         * Removes the currently active layer from the application.
+         * Prompts for confirmation before removal. If no layers exist, it does nothing.
+         */
+        function removeLayer() {
+            if (layers.length === 0) return;
+
+            showConfirmation('Are you sure you want to delete the active layer?', () => {
+                const activeCanvas = layers[activeLayerIndex].canvas;
+                canvasContainer.removeChild(activeCanvas);
+
+                layers.splice(activeLayerIndex, 1);
+
+                // Adjust activeLayerIndex and re-select
+                if (layers.length > 0) {
+                    activeLayerIndex = Math.min(activeLayerIndex, layers.length - 1);
+                    selectLayer(activeLayerIndex);
+                } else {
+                    activeLayerIndex = -1; // No layers left
+                    renderLayerList(); // Clear layer list UI
+                }
+
+                // Re-index z-indexes of remaining layers to maintain order above background and below overlay
+                layers.forEach((layer, index) => {
+                    layer.canvas.style.zIndex = index + 1; // +1 to be above background canvas (z-index 0)
+                });
+
+                renderLayerList(); // Re-render layer list UI
+            });
+        }
+
+        /**
+         * Renders (or re-renders) the list of layers in the UI.
+         * Creates list items for each layer.
+         */
+        function renderLayerList() {
+            layerListDiv.innerHTML = ''; // Clear existing list
+
+            // Check if there are any drawing layers (excluding the fixed background layer)
+            if (layers.length === 0) {
+                const noLayersText = document.createElement('p');
+                noLayersText.className = 'text-center text-gray-500 text-sm py-4';
+                noLayersText.textContent = 'No drawing layers yet. Add one!';
+                layerListDiv.appendChild(noLayersText);
+                return;
+            }
+
+            layers.forEach((layer, index) => {
+                const layerItem = document.createElement('div');
+                layerItem.className = `layer-item ${index === activeLayerIndex ? 'active-layer' : ''}`;
+                layerItem.setAttribute('data-index', index);
+                layerItem.innerHTML = `<span>${layer.name}</span>`;
+                layerItem.addEventListener('click', () => selectLayer(index));
+                layerListDiv.appendChild(layerItem);
+            });
+        }
+
+        /**
+         * Sets the currently active tool.
+         * Updates the UI to highlight the active tool button.
+         * @param {string} toolName - The name of the tool (e.g., 'brush', 'erase').
+         */
+        function setActiveTool(toolName) {
+            currentTool = toolName;
+
+            toolButtons.forEach(button => button.classList.remove('active'));
+
+            const toolBtnElement = document.getElementById(`${toolName}Tool`);
+            if (toolBtnElement) {
+                toolBtnElement.classList.add('active');
+            }
+
+            isDrawing = false;
+            isSelecting = false;
+            clearSelectionOverlay();
+            selection = null; // Clear any active selection when changing tool
+
+            // Adjust pointer-events based on tool for interaction on specific canvases
+            layers.forEach((layer, index) => {
+                // Only the active layer should receive drawing/erasing/filling events
+                if (index === activeLayerIndex && (toolName === 'brush' || toolName === 'erase' || toolName === 'fill')) {
+                    layer.canvas.style.pointerEvents = 'auto';
+                } else {
+                    layer.canvas.style.pointerEvents = 'none'; // Inactive layers don't receive events
+                }
+            });
+
+            // Selection overlay receives events only when 'select' tool is active
+            selectionOverlayCanvas.style.pointerEvents = (toolName === 'select') ? 'auto' : 'none';
+            backgroundCanvas.style.pointerEvents = 'none'; // Background canvas is never interactive directly
+
+            // Update cursor style on the canvas container
+            if (canvasContainer) {
+                if (currentTool === 'brush' || currentTool === 'erase') {
+                    canvasContainer.style.cursor = 'crosshair';
+                } else if (currentTool === 'fill') {
+                    canvasContainer.style.cursor = 'cell';
+                } else if (currentTool === 'select') {
+                    canvasContainer.style.cursor = 'grab';
+                } else {
+                    canvasContainer.style.cursor = 'default';
+                }
+            }
+        }
+
+        /**
+         * Clears the selection rectangle drawn on the overlay canvas.
+         */
+        function clearSelectionOverlay() {
+            selectionOverlayCtx.clearRect(0, 0, selectionOverlayCanvas.width, selectionOverlayCanvas.height);
+        }
+
+        /**
+         * Draws the current selection rectangle on the overlay canvas.
+         */
+        function drawSelectionOverlay() {
+            clearSelectionOverlay();
+            if (selection) {
+                selectionOverlayCtx.strokeStyle = '#3b82f6';
+                selectionOverlayCtx.lineWidth = 2;
+                selectionOverlayCtx.setLineDash([5, 5]);
+                selectionOverlayCtx.strokeRect(selection.x1, selection.y1, selection.width, selection.height);
+                selectionOverlayCtx.setLineDash([]);
+            }
+        }
+
+        /**
+         * Transforms raw mouse/touch coordinates from display space to canvas's internal resolution.
+         * @param {number} clientX - The clientX from the event.
+         * @param {number} clientY - The clientY from the event.
+         * @returns {{x: number, y: number}} - The transformed coordinates.
+         */
+        function transformCoordinates(clientX, clientY) {
+            const rect = canvasContainer.getBoundingClientRect();
+            const displayX = clientX - rect.left;
+            const displayY = clientY - rect.top;
+
+            // Calculate scale factors based on the actual *display size* of the canvas container
+            // and the *internal resolution* of the canvases.
+            const scaleX = canvasResolution.width / rect.width;
+            const scaleY = canvasResolution.height / rect.height;
+
+            return {
+                x: displayX * scaleX,
+                y: displayY * scaleY
+            };
+        }
+
+
+        /**
+         * Handles mouse down events on the canvas container.
+         * Initiates drawing or selection based on the active tool.
+         * @param {MouseEvent} e - The mouse event object.
+         */
+        function handleMouseDown(e) {
+            // Only respond if there's an active drawing layer for brush/erase/fill
+            if (activeLayerIndex === -1 && (currentTool === 'brush' || currentTool === 'erase' || currentTool === 'fill')) {
+                // If no active layer, and tool requires one, inform user and exit
+                showConfirmation('Please add a layer first to draw or fill.', () => {}, true);
+                return;
+            }
+
+            const { x, y } = transformCoordinates(e.clientX, e.clientY);
+
+            lastX = x;
+            lastY = y;
+
+            if (currentTool === 'brush' || currentTool === 'erase') {
+                isDrawing = true;
+                const activeCtx = layers[activeLayerIndex].context;
+                activeCtx.beginPath();
+                activeCtx.moveTo(x, y);
+                applyContextSettings(activeCtx);
+
+                // For a single dot when clicking without dragging
+                if (currentTool === 'brush') {
+                    activeCtx.lineTo(x + 0.1, y + 0.1);
+                    activeCtx.stroke();
+                } else if (currentTool === 'erase') {
+                    // Erase is done by drawing a transparent path using destination-out
+                    activeCtx.clearRect(x - eraseSize / 2, y - eraseSize / 2, eraseSize, eraseSize);
+                }
+            } else if (currentTool === 'select') {
+                isSelecting = true;
+                // Store initial selection coordinates in canvas resolution
+                selection = { x1: x, y1: y, x2: x, y2: y, width: 0, height: 0 };
+            } else if (currentTool === 'fill') {
+                 if (activeLayerIndex !== -1) {
+                     performFill();
+                 }
+            }
+        }
+
+        /**
+         * Handles mouse move events on the canvas container.
+         * Performs drawing or selection updates while the mouse button is down.
+         * @param {MouseEvent} e - The mouse event object.
+         */
+        function handleMouseMove(e) {
+            if (!isDrawing && !isSelecting) return; // Only process if drawing or selecting is active
+
+            if (activeLayerIndex === -1 && (currentTool === 'brush' || currentTool === 'erase')) return;
+
+            const { x, y } = transformCoordinates(e.clientX, e.clientY);
+
+            if (isDrawing) {
+                const activeCtx = layers[activeLayerIndex].context;
+                if (currentTool === 'brush') {
+                    activeCtx.lineTo(x, y);
+                    activeCtx.stroke();
+                } else if (currentTool === 'erase') {
+                    activeCtx.clearRect(lastX - eraseSize / 2, lastY - eraseSize / 2, eraseSize, eraseSize);
+                }
+                lastX = x;
+                lastY = y;
+            } else if (isSelecting && selection) {
+                selection.x2 = x;
+                selection.y2 = y;
+                selection.width = selection.x2 - selection.x1;
+                selection.height = selection.y2 - selection.y1;
+                drawSelectionOverlay(); // Redraw selection on overlay
+            }
+        }
+
+        /**
+         * Handles mouse up events on the canvas container.
+         * Stops drawing or finalizes selection.
+         * @param {MouseEvent} e - The mouse event object.
+         */
+        function handleMouseUp(e) {
+            if (activeLayerIndex === -1) {
+                isDrawing = false;
+                isSelecting = false;
+                return;
+            }
+
+            isDrawing = false;
+            if (isSelecting) {
+                isSelecting = false;
+                if (selection) {
+                    // Normalize selection coordinates to top-left, width, height
+                    const normalizedSelection = {
+                        x: Math.min(selection.x1, selection.x2),
+                        y: Math.min(selection.y1, selection.y2),
+                        width: Math.abs(selection.x2 - selection.x1), // Use calculated width
+                        height: Math.abs(selection.y2 - selection.y1) // Use calculated height
+                    };
+                    selection = normalizedSelection;
+                    drawSelectionOverlay(); // Redraw final selection
+                }
+            }
+        }
+
+        /**
+         * Applies the current brush/erase/opacity settings to the given canvas context.
+         * @param {CanvasRenderingContext2D} ctx - The 2D rendering context to apply settings to.
+         */
+        function applyContextSettings(ctx) {
+            ctx.globalAlpha = currentOpacity;
+            if (currentTool === 'brush') {
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = brushSize;
+                ctx.globalCompositeOperation = 'source-over'; // Default drawing mode
+            } else if (currentTool === 'erase') {
+                ctx.lineWidth = eraseSize;
+                ctx.globalCompositeOperation = 'destination-out'; // Erase mode (draws transparent pixels)
+            } else if (currentTool === 'fill') {
+                ctx.fillStyle = currentColor;
+                ctx.globalAlpha = currentOpacity;
+                ctx.globalCompositeOperation = 'source-over';
+            }
+        }
+
+        /**
+         * Performs the fill operation on the active layer.
+         * If a selection exists, fills within the selection. Otherwise, fills the entire canvas.
+         */
+        function performFill() {
+            if (activeLayerIndex === -1) return;
+            const activeCtx = layers[activeLayerIndex].context;
+
+            applyContextSettings(activeCtx);
+
+            activeCtx.save(); // Save the current canvas state
+
+            if (selection && selection.width > 0 && selection.height > 0) {
+                // If there's a valid selection, create a clipping path
+                activeCtx.beginPath();
+                activeCtx.rect(selection.x, selection.y, selection.width, selection.height);
+                activeCtx.clip(); // All subsequent drawing operations will be clipped to this rectangle
+            }
+
+            activeCtx.fillRect(0, 0, activeCtx.canvas.width, activeCtx.canvas.height);
+
+            activeCtx.restore(); // Restore the canvas state (removes the clipping path)
+        }
+
+        /**
+         * Clears all layers and creates a new blank canvas/document with specified dimensions.
+         * The background canvas is filled with the current `backgroundColor`.
+         * Prompts for confirmation before clearing.
+         * @param {number} [width=800] - The new width for the canvas.
+         * @param {number} [height=600] - The new height for the canvas.
+         */
+        function createNewImage(width = canvasResolution.width, height = canvasResolution.height) {
+            const confirmMessage = layers.length > 0 ? 'Are you sure you want to create a new image? All current drawing layers will be lost.' : 'Create a new blank image?';
+            showConfirmation(confirmMessage, () => {
+                // Remove all existing drawing canvases from the DOM
+                layers.forEach(layer => {
+                    canvasContainer.removeChild(layer.canvas);
+                });
+                layers = []; // Clear the layers array
+                activeLayerIndex = -1; // Reset active layer
+
+                clearSelectionOverlay(); // Clear any active selection on overlay
+                selection = null;
+
+                // Set new resolution for all canvases
+                setAllCanvasResolutions(width, height);
+
+                // Add an initial drawing layer
+                addLayer();
+                renderLayerList();
+                // Close dropdown after action
+                fileOpsDropdown.classList.remove('show');
+            });
+        }
+
+        /**
+         * Displays a modal for the user to input new width and height for the canvas.
+         * When confirmed, it creates a new blank image with those dimensions.
+         */
+        function showResizeImageModal() {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <p class="text-lg font-semibold mb-4">Resize Image</p>
+                    <p class="text-sm text-gray-600 mb-4">This will create a new blank canvas with the specified dimensions, losing current content on drawing layers.</p>
+                    <div class="modal-input-group">
+                        <label for="newWidth">Width (px):</label>
+                        <input type="number" id="newWidth" value="${canvasResolution.width}" min="100" max="4000" step="1">
+                    </div>
+                    <div class="modal-input-group">
+                        <label for="newHeight">Height (px):</label>
+                        <input type="number" id="newHeight" value="${canvasResolution.height}" min="100" max="4000" step="1">
+                    </div>
+                    <div class="modal-buttons">
+                        <button id="resizeConfirmBtn" class="bg-blue-500 hover:bg-blue-600 text-white">Apply</button>
+                        <button id="resizeCancelBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800">Cancel</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('resizeConfirmBtn').onclick = () => {
+                const newWidth = parseInt(document.getElementById('newWidth').value);
+                const newHeight = parseInt(document.getElementById('newHeight').value);
+
+                if (isNaN(newWidth) || isNaN(newHeight) || newWidth <= 0 || newHeight <= 0) {
+                    showConfirmation('Please enter valid positive numbers for width and height (min 100px, max 4000px).', () => {}, true);
+                    return;
+                }
+                createNewImage(newWidth, newHeight); // Creates new image with new resolution
+                document.body.removeChild(modal);
+            };
+
+            document.getElementById('resizeCancelBtn').onclick = () => {
+                document.body.removeChild(modal);
+            };
+            // Close dropdown after action
+            fileOpsDropdown.classList.remove('show');
+        }
+
+
+        /**
+         * Handles importing an image file onto the active layer.
+         * The image will be scaled to fit the active layer's canvas.
+         */
+        function importImage() {
+            if (activeLayerIndex === -1) {
+                showConfirmation('Please add a drawing layer first to import an image onto.', () => {}, true);
+                // Close dropdown after action
+                fileOpsDropdown.classList.remove('show');
+                return;
+            }
+            imageInput.click(); // Trigger the hidden file input click
+        }
+
+        /**
+         * Handles the file selection for image import.
+         * Draws the selected image onto the active layer.
+         * @param {Event} e - The change event from the file input.
+         */
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                 fileOpsDropdown.classList.remove('show'); // Close dropdown if no file selected
+                 return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const activeCtx = layers[activeLayerIndex].context;
+                    const canvasWidth = activeCtx.canvas.width;
+                    const canvasHeight = activeCtx.canvas.height;
+
+                    activeCtx.clearRect(0, 0, canvasWidth, canvasHeight); // Clear the current active layer
+
+                    // Calculate scaling to fit image while maintaining aspect ratio
+                    const hRatio = canvasWidth / img.width;
+                    const vRatio = canvasHeight / img.height;
+                    const ratio = Math.min(hRatio, vRatio);
+
+                    const centerShiftX = (canvasWidth - img.width * ratio) / 2;
+                    const centerShiftY = (canvasHeight - img.height * ratio) / 2;
+
+                    activeCtx.drawImage(img, 0, 0, img.width, img.height,
+                                        centerShiftX, centerShiftY, img.width * ratio, img.height * ratio);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+            e.target.value = ''; // Clear the input so same file can be imported again
+            // Close dropdown after action
+            fileOpsDropdown.classList.remove('show');
+        });
+
+        /**
+         * Exports the combined content of all layers (including background) as a single image (PNG or JPG).
+         * Prompts the user for the desired format.
+         */
+        function exportImage() {
+            if (layers.length === 0) {
+                 showConfirmation('There are no drawing layers to export. Add some content first!', () => {}, true);
+                 // Close dropdown after action
+                 fileOpsDropdown.classList.remove('show');
+                 return;
+            }
+
+            showFormatSelectionModal((format) => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvasResolution.width; // Use the actual canvas resolution
+                tempCanvas.height = canvasResolution.height;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                // Draw background first
+                tempCtx.drawImage(backgroundCanvas, 0, 0);
+
+                // Draw each drawing layer on top
+                layers.forEach(layer => {
+                    tempCtx.drawImage(layer.canvas, 0, 0);
+                });
+
+                let imageURL = '';
+                let filename = 'untitled';
+
+                if (format === 'png') {
+                    imageURL = tempCanvas.toDataURL('image/png');
+                    filename += '.png';
+                } else if (format === 'jpeg') {
+                    imageURL = tempCanvas.toDataURL('image/jpeg', 0.9); // 0.9 quality for JPG
+                    filename += '.jpeg';
+                }
+
+                downloadLink.href = imageURL;
+                downloadLink.download = filename; // Set the download filename
+                downloadLink.click(); // Programmatically click the link to trigger download
+            });
+            // Close dropdown after action
+            fileOpsDropdown.classList.remove('show');
+        }
+
+        /**
+         * Displays a modal for the user to select the export image format.
+         * @param {function} callback - Function to call with the selected format ('png' or 'jpeg').
+         */
+        function showFormatSelectionModal(callback) {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <p class="text-lg font-semibold mb-4">Select Export Format</p>
+                    <div class="flex flex-col gap-2 mb-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="exportFormat" value="png" checked class="form-radio text-blue-600 h-5 w-5">
+                            <span class="ml-2 text-gray-700">PNG (Lossless, supports transparency)</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="exportFormat" value="jpeg" class="form-radio text-blue-600 h-5 w-5">
+                            <span class="ml-2 text-gray-700">JPG (Compressed, no transparency)</span>
+                        </label>
+                    </div>
+                    <div class="modal-buttons">
+                        <button id="exportConfirmBtn" class="bg-blue-500 hover:bg-blue-600 text-white">Export</button>
+                        <button id="exportCancelBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800">Cancel</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('exportConfirmBtn').onclick = () => {
+                const selectedFormat = document.querySelector('input[name="exportFormat"]:checked').value;
+                callback(selectedFormat);
+                document.body.removeChild(modal);
+            };
+
+            document.getElementById('exportCancelBtn').onclick = () => {
+                document.body.removeChild(modal);
+            };
+        }
+
+        /**
+         * Custom confirmation/info dialog to replace alert/confirm.
+         * @param {string} message - The message to display.
+         * @param {function} onConfirm - Callback function if user confirms (or OKs for info).
+         * @param {boolean} [isInfo=false] - If true, it's an info dialog with only an OK button.
+         */
+        function showConfirmation(message, onConfirm, isInfo = false) {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <p class="text-lg font-semibold mb-4">${message}</p>
+                    <div class="modal-buttons">
+                        ${isInfo ?
+                            `<button id="confirmOk" class="bg-blue-500 hover:bg-blue-600 text-white">OK</button>` :
+                            `<button id="confirmYes" class="bg-blue-500 hover:bg-blue-600 text-white">Yes</button>
+                             <button id="confirmNo" class="bg-gray-300 hover:bg-gray-400 text-gray-800">No</button>`
+                        }
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            if (isInfo) {
+                document.getElementById('confirmOk').onclick = () => {
+                    onConfirm();
+                    document.body.removeChild(modal);
+                };
+            } else {
+                document.getElementById('confirmYes').onclick = () => {
+                    onConfirm();
+                    document.body.removeChild(modal);
+                };
+                document.getElementById('confirmNo').onclick = () => {
+                    document.body.removeChild(modal);
+                };
+            }
+        }
+
+
+        // --- Event Listeners ---
+
+        // Tool button click handlers
+        brushToolBtn.addEventListener('click', () => setActiveTool('brush'));
+        eraseToolBtn.addEventListener('click', () => setActiveTool('erase'));
+        fillToolBtn.addEventListener('click', () => setActiveTool('fill'));
+        selectToolBtn.addEventListener('click', () => setActiveTool('select'));
+
+        // Slider change handlers
+        brushSizeSlider.addEventListener('input', (e) => {
+            brushSize = parseInt(e.target.value);
+            brushSizeValueSpan.textContent = brushSize;
+            if (activeLayerIndex !== -1 && currentTool === 'brush') {
+                layers[activeLayerIndex].context.lineWidth = brushSize;
+            }
+        });
+
+        eraseSizeSlider.addEventListener('input', (e) => {
+            eraseSize = parseInt(e.target.value);
+            eraseSizeValueSpan.textContent = eraseSize;
+            if (activeLayerIndex !== -1 && currentTool === 'erase') {
+                layers[activeLayerIndex].context.lineWidth = eraseSize;
+            }
+        });
+
+        opacitySlider.addEventListener('input', (e) => {
+            currentOpacity = parseFloat(e.target.value) / 100;
+            opacityValueSpan.textContent = `${e.target.value}%`;
+            if (activeLayerIndex !== -1) {
+                layers[activeLayerIndex].context.globalAlpha = currentOpacity;
+            }
+            selectionOverlayCtx.globalAlpha = currentOpacity; // Also affect selection overlay drawing
+        });
+
+        colorPicker.addEventListener('input', (e) => {
+            currentColor = e.target.value;
+            if (activeLayerIndex !== -1 && currentTool === 'brush') {
+                layers[activeLayerIndex].context.strokeStyle = currentColor;
+            }
+        });
+
+        bgColorPicker.addEventListener('input', (e) => {
+            backgroundColor = e.target.value;
+            backgroundCtx.fillStyle = backgroundColor;
+            backgroundCtx.fillRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+        });
+
+        // Hamburger menu and file operations
+        hamburgerMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent click from immediately propagating to document
+            fileOpsDropdown.classList.toggle('show');
+        });
+
+        // Close dropdown if clicked outside
+        document.addEventListener('click', (e) => {
+            if (!hamburgerMenuBtn.contains(e.target) && !fileOpsDropdown.contains(e.target)) {
+                fileOpsDropdown.classList.remove('show');
+            }
+        });
+
+        newImageBtn.addEventListener('click', createNewImage);
+        resizeImageBtn.addEventListener('click', showResizeImageModal);
+        importImageBtn.addEventListener('click', importImage);
+        exportImageBtn.addEventListener('click', exportImage);
+
+        // Layer control buttons
+        addLayerBtn.addEventListener('click', addLayer);
+        removeLayerBtn.addEventListener('click', removeLayer);
+
+        // Canvas drawing/selection events
+        canvasContainer.addEventListener('mousedown', handleMouseDown);
+        canvasContainer.addEventListener('mousemove', handleMouseMove);
+        canvasContainer.addEventListener('mouseup', handleMouseUp);
+        // Also handle mouse leave to stop drawing if mouse leaves canvas
+        canvasContainer.addEventListener('mouseleave', () => {
+            isDrawing = false;
+            if (isSelecting && selection) {
+                isSelecting = false;
+                if (selection.width === 0 && selection.height === 0) {
+                     selection = null;
+                     clearSelectionOverlay();
+                }
+            }
+        });
+
+        // Touch event handling for mobile devices
+        canvasContainer.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleMouseDown({ clientX: touch.clientX, clientY: touch.clientY });
+        }, { passive: false });
+
+        canvasContainer.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY });
+        }, { passive: false });
+
+        canvasContainer.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            handleMouseUp({});
+        }, { passive: false });
+
+        // Window resize event to update canvas display dimensions
+        window.addEventListener('resize', initializeCanvasDisplayDimensions);
+
+        // --- Initialization ---
+        window.onload = () => {
+            // Set initial background color and fill the background canvas
+            bgColorPicker.value = '#FFFFFF';
+            backgroundColor = '#FFFFFF';
+
+            // Set initial canvas resolution and create the first layer
+            setAllCanvasResolutions(canvasResolution.width, canvasResolution.height);
+            addLayer(); // Adds the first user-editable layer
+            setActiveTool('brush');
+            renderLayerList();
+            initializeCanvasDisplayDimensions(); // Set up CSS display sizes
+        };
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Runner</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip CDN for creating/reading zip files -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.7.1/dist/jszip.min.js"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            /* Using /bg.png as the background image */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url('/bg.png');
+            background-size: cover;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }
+        .liquid-glass-container {
+            background-color: transparent;
+            backdrop-filter: blur(10px);
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: rgba(31, 41, 55, 0.9); /* gray-800 with slight transparency */
+            padding: 2.5rem; /* p-10 */
+            border-radius: 1rem; /* rounded-xl */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            max-width: 95%;
+            max-height: 95%;
+            overflow-y: auto;
+            position: relative;
+            backdrop-filter: blur(10px); /* Liquid glass effect */
+        }
+        .modal-preview-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: #1e293b; /* Dark background for the preview frame */
+        }
+        /* Custom styles for the toggle buttons */
+        .toggle-button {
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .toggle-button.active {
+            border-color: #f97316; /* Orange-500 */
+        }
+        #drag-and-drop-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(25, 30, 45, 0.9);
+            border: 4px dashed #f97316;
+            z-index: 999;
+            pointer-events: none;
+            color: #f97316;
+            font-size: 2rem;
+            font-weight: bold;
+            border-radius: 1rem;
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen p-4 font-sans">
+    <div id="drag-and-drop-overlay">
+        Drop your app zip file here to import!
+    </div>
+    <div class="container mx-auto max-w-7xl">
+        <div class="liquid-glass-container rounded-xl shadow-2xl p-6 md:p-10 mb-8">
+            <!-- Main controls -->
+            <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
+                <button id="show-create-app-button" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform duration-200 transform hover:scale-105 w-full md:w-auto">
+                    Create New App
+                </button>
+                <div class="flex space-x-2 w-full md:w-auto">
+                    <button id="export-apps-button" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform duration-200 transform hover:scale-105 flex-1">
+                        Export All Apps
+                    </button>
+                    <button id="import-apps-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform duration-200 transform hover:scale-105 flex-1">
+                        Import Apps
+                    </button>
+                </div>
+                <!-- Hidden file input for import -->
+                <input type="file" id="import-file-input" class="hidden" accept=".zip">
+            </div>
+        </div>
+
+        <!-- App List (grid) -->
+        <div class="p-6 md:p-10">
+            <div id="app-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- App cards will be rendered here by JS -->
+            </div>
+            <p id="no-apps-message" class="text-center text-gray-400 mt-8 hidden">You have no apps yet. Create one to get started!</p>
+        </div>
+    </div>
+
+    <!-- Create App Modal -->
+    <div id="create-modal" class="modal hidden">
+        <div class="modal-content w-full md:w-2/3 lg:w-1/2">
+            <h2 class="text-3xl font-semibold mb-4 text-center">Create a New App</h2>
+            <div class="mb-4">
+                <label for="app-name-input" class="block text-gray-300 font-medium mb-2">App Name</label>
+                <input type="text" id="app-name-input" class="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="e.g., My Awesome Game">
+            </div>
+            <div class="mb-4">
+                <label for="icon-file-input" class="block text-gray-300 font-medium mb-2">App Icon (1024x1024 .png)</label>
+                <input type="file" id="icon-file-input" class="w-full text-white file:bg-gray-900 file:border-0 file:text-white file:rounded-lg file:py-2 file:px-4 file:cursor-pointer hover:file:bg-gray-700">
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-300 font-medium mb-2">Add HTML Content</label>
+                <!-- Toggle Buttons -->
+                <div class="flex rounded-lg bg-gray-800 p-1 mb-4 space-x-2">
+                    <button id="upload-mode-button" class="flex-1 py-2 px-4 rounded-md text-sm font-medium bg-gray-700 text-white toggle-button active">Upload File</button>
+                    <button id="paste-mode-button" class="flex-1 py-2 px-4 rounded-md text-sm font-medium text-gray-300 toggle-button">Paste Code</button>
+                </div>
+                
+                <!-- Upload File Container -->
+                <div id="upload-mode-container">
+                    <input type="file" id="app-html-input" class="w-full text-white file:bg-gray-900 file:border-0 file:text-white file:rounded-lg file:py-2 file:px-4 file:cursor-pointer hover:file:bg-gray-700">
+                    <p id="app-html-filename" class="text-gray-400 text-sm mt-2 hidden">No file chosen</p>
+                </div>
+
+                <!-- Paste Code Container (initially hidden) -->
+                <div id="paste-mode-container" class="hidden">
+                    <textarea id="app-html-textarea" rows="15" class="w-full p-4 bg-gray-900 border border-gray-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="<!DOCTYPE html>..."></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-4">
+                <button id="cancel-create-button" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg transition-transform duration-200">Cancel</button>
+                <button id="save-app-button" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition-transform duration-200">Save App</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Preview Modal -->
+    <div id="preview-modal" class="modal hidden">
+        <div class="relative w-full h-full p-6 flex flex-col">
+            <!-- Sandboxed iframe to prevent malicious code from affecting the parent page -->
+            <iframe id="app-preview-frame" class="modal-preview-frame rounded-lg flex-grow" sandbox="allow-scripts allow-forms allow-same-origin allow-modals allow-popups allow-pointer-lock allow-fullscreen"></iframe>
+        </div>
+    </div>
+
+    <script>
+        // Use a unique key for local storage to avoid conflicts
+        const localStorageKey = 'html_app_runner_apps';
+        let apps = [];
+        let currentAppIndex = -1; // To track which app is being previewed/deleted
+        let isUploadMode = true; // Tracks the current input mode
+
+        const appList = document.getElementById('app-list');
+        const noAppsMessage = document.getElementById('no-apps-message');
+        const showCreateAppButton = document.getElementById('show-create-app-button');
+        const exportAppsButton = document.getElementById('export-apps-button');
+        const importAppsButton = document.getElementById('import-apps-button');
+        const importFileInput = document.getElementById('import-file-input');
+        const createModal = document.getElementById('create-modal');
+        const previewModal = document.getElementById('preview-modal');
+        const saveAppButton = document.getElementById('save-app-button');
+        const cancelCreateButton = document.getElementById('cancel-create-button');
+        const closePreviewButton = document.getElementById('close-preview-button');
+        const deleteAppFromPreviewButton = document.getElementById('delete-app-from-preview');
+        const appNameInput = document.getElementById('app-name-input');
+        const iconFileInput = document.getElementById('icon-file-input');
+        const appHtmlInput = document.getElementById('app-html-input');
+        const appHtmlTextarea = document.getElementById('app-html-textarea');
+        const appHtmlFilename = document.getElementById('app-html-filename');
+        const appPreviewFrame = document.getElementById('app-preview-frame');
+        const uploadModeButton = document.getElementById('upload-mode-button');
+        const pasteModeButton = document.getElementById('paste-mode-button');
+        const uploadModeContainer = document.getElementById('upload-mode-container');
+        const pasteModeContainer = document.getElementById('paste-mode-container');
+        const dragDropOverlay = document.getElementById('drag-and-drop-overlay');
+
+        // --- Core Functions ---
+
+        /**
+         * Saves the current apps array to local storage.
+         */
+        const saveApps = () => {
+            try {
+                localStorage.setItem(localStorageKey, JSON.stringify(apps));
+            } catch (e) {
+                console.error('Failed to save to local storage', e);
+                // Check for a common local storage error (QuotaExceededError)
+                if (e.name === 'QuotaExceededError') {
+                    alert('Error: Local storage limit exceeded. Your apps could not be saved. You may need to delete some apps.');
+                } else {
+                    alert('An error occurred while saving your apps.');
+                }
+            }
+        };
+
+        /**
+         * Renders the list of apps in the UI grid.
+         */
+        const renderAppList = () => {
+            appList.innerHTML = '';
+            if (apps.length === 0) {
+                noAppsMessage.classList.remove('hidden');
+                return;
+            } else {
+                noAppsMessage.classList.add('hidden');
+            }
+
+            apps.forEach((app, index) => {
+                const appCard = document.createElement('div');
+                appCard.className = 'bg-gray-700 rounded-xl shadow-lg overflow-hidden flex flex-col transition-transform duration-200 transform hover:scale-105 relative group';
+                appCard.innerHTML = `
+                    <div class="p-4 flex-grow flex flex-col items-center justify-center h-48" onclick="openPreviewModal(${index})">
+                        <img src="${app.icon}" alt="${app.name} icon" class="w-24 h-24 object-cover rounded-xl mb-2">
+                        <p class="text-xl font-semibold text-center text-white truncate w-full px-2">${app.name}</p>
+                    </div>
+                    <div class="absolute top-2 right-2 p-1 bg-gray-800 rounded-full transition-opacity duration-200 opacity-0 group-hover:opacity-100">
+                        <button onclick="event.stopPropagation(); exportSingleApp(${index})" class="text-gray-400 hover:text-orange-500">
+                            <i class="fas fa-file-export fa-lg"></i>
+                        </button>
+                    </div>
+                `;
+                appList.appendChild(appCard);
+            });
+        };
+
+        /**
+         * Resizes an image to 1024x1024 and converts it to a base64 string.
+         * @param {File} file The image file.
+         * @returns {Promise<string>} A promise that resolves with the base64 string.
+         */
+        const resizeIcon = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = 1024;
+                        canvas.height = 1024;
+                        ctx.drawImage(img, 0, 0, 1024, 1024);
+                        resolve(canvas.toDataURL('image/png'));
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        };
+
+        /**
+         * Exports a single app as a zip file.
+         * @param {number} index The index of the app to export.
+         */
+        const exportSingleApp = async (index) => {
+            const app = apps[index];
+            if (!app) {
+                alert('App not found.');
+                return;
+            }
+            const zip = new JSZip();
+            const appFolder = zip.folder(app.name.replace(/[\\/:*?"<>|]/g, '_'));
+            appFolder.file('index.html', app.html);
+            const base64Data = app.icon.split(',')[1];
+            appFolder.file('icon.png', base64Data, { base64: true });
+            
+            const content = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${app.name.replace(/[\\/:*?"<>|]/g, '_')}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        /**
+         * Handles importing apps from a zip file.
+         * @param {File} file The file to import.
+         */
+        const handleImportFile = async (file) => {
+            if (!file) return;
+
+            try {
+                if (file.name.endsWith('.zip')) {
+                    const zip = new JSZip();
+                    const newZip = await zip.loadAsync(file);
+                    const newApps = [];
+                    const folderNames = new Set(
+                        Object.keys(newZip.files)
+                              .filter(name => name.includes('/') && !name.endsWith('/') && !name.startsWith('__MACOSX/'))
+                              .map(name => name.split('/')[0])
+                    );
+
+                    if (folderNames.size === 0) {
+                        alert('No valid app folders were found in the zip. Each app should be in its own folder with `index.html` and `icon.png` inside.');
+                        return;
+                    }
+                    let importCount = 0;
+                    for (const folderName of folderNames) {
+                        try {
+                            const appFiles = newZip.folder(folderName);
+                            const htmlContent = await appFiles.file('index.html').async('string');
+                            const iconBase64 = await appFiles.file('icon.png').async('base64');
+                            if (htmlContent && iconBase64) {
+                                newApps.push({ name: folderName, html: htmlContent, icon: `data:image/png;base64,${iconBase64}` });
+                                importCount++;
+                            }
+                        } catch (e) {
+                            console.warn(`Skipping invalid app folder '${folderName}': missing required files or corrupted.`);
+                        }
+                    }
+                    if (newApps.length > 0) {
+                        apps = [...apps, ...newApps];
+                        saveApps();
+                        renderAppList();
+                        alert(`${importCount} app(s) imported successfully!`);
+                    } else {
+                        alert('No valid apps found in the ZIP file.');
+                    }
+                } else {
+                    alert('Unsupported file type. Please use a .zip file.');
+                }
+            } catch (e) {
+                console.error('Import error:', e);
+                alert('Failed to import apps. The file may be corrupted or in an unsupported format.');
+            }
+            importFileInput.value = null;
+        };
+
+        // --- Modal Functions ---
+
+        const openCreateModal = () => {
+            createModal.classList.remove('hidden');
+            appNameInput.value = '';
+            iconFileInput.value = null;
+            appHtmlInput.value = null;
+            appHtmlTextarea.value = '';
+            appHtmlFilename.textContent = 'No file chosen';
+            appHtmlFilename.classList.remove('hidden');
+            
+            // Set initial mode to upload
+            isUploadMode = true;
+            toggleHtmlInputMode();
+        };
+
+        const closeCreateModal = () => {
+            createModal.classList.add('hidden');
+        };
+
+        const openPreviewModal = (index) => {
+            currentAppIndex = index;
+            const app = apps[index];
+
+            const frameDoc = appPreviewFrame.contentDocument || appPreviewFrame.contentWindow.document;
+            frameDoc.open();
+            frameDoc.write(app.html);
+            frameDoc.close();
+
+            previewModal.classList.remove('hidden');
+        };
+
+        // The closePreviewModal and deleteApp functions are removed as per user request.
+        // The only way to exit is to reload the page.
+
+        /**
+         * Toggles between the file upload and text area modes.
+         */
+        const toggleHtmlInputMode = () => {
+            if (isUploadMode) {
+                uploadModeContainer.classList.remove('hidden');
+                pasteModeContainer.classList.add('hidden');
+                uploadModeButton.classList.add('active', 'bg-gray-700', 'text-white');
+                pasteModeButton.classList.remove('active', 'bg-gray-700', 'text-white');
+                pasteModeButton.classList.add('text-gray-300');
+            } else {
+                uploadModeContainer.classList.add('hidden');
+                pasteModeContainer.classList.remove('hidden');
+                pasteModeButton.classList.add('active', 'bg-gray-700', 'text-white');
+                uploadModeButton.classList.remove('active', 'bg-gray-700', 'text-white');
+                uploadModeButton.classList.add('text-gray-300');
+            }
+        };
+
+        // --- Event Listeners and UI Logic ---
+
+        showCreateAppButton.addEventListener('click', openCreateModal);
+        cancelCreateButton.addEventListener('click', closeCreateModal);
+        
+        uploadModeButton.addEventListener('click', () => {
+            isUploadMode = true;
+            toggleHtmlInputMode();
+        });
+        
+        pasteModeButton.addEventListener('click', () => {
+            isUploadMode = false;
+            toggleHtmlInputMode();
+        });
+
+        appHtmlInput.addEventListener('change', (event) => {
+            if (event.target.files.length > 0) {
+                appHtmlFilename.textContent = event.target.files[0].name;
+                appHtmlFilename.classList.remove('hidden');
+            } else {
+                appHtmlFilename.textContent = 'No file chosen';
+                appHtmlFilename.classList.add('hidden');
+            }
+        });
+
+        saveAppButton.addEventListener('click', async () => {
+            const name = appNameInput.value.trim();
+            const iconFile = iconFileInput.files[0];
+            let htmlContent = '';
+
+            if (isUploadMode) {
+                const htmlFile = appHtmlInput.files[0];
+                if (!name || !htmlFile || !iconFile) {
+                    alert('Please provide a name, an HTML file, and an icon file.');
+                    return;
+                }
+                htmlContent = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsText(htmlFile);
+                });
+            } else {
+                htmlContent = appHtmlTextarea.value;
+                if (!name || !htmlContent || !iconFile) {
+                    alert('Please provide a name, HTML code, and an icon file.');
+                    return;
+                }
+            }
+
+            try {
+                const iconBase64 = await resizeIcon(iconFile);
+                apps.push({ name, html: htmlContent, icon: iconBase64 });
+                saveApps();
+                renderAppList();
+                closeCreateModal();
+            } catch (e) {
+                alert('Failed to process the files. Please try again.');
+                console.error('File processing error:', e);
+            }
+        });
+
+        exportAppsButton.addEventListener('click', async () => {
+            const zip = new JSZip();
+            apps.forEach(app => {
+                const appFolder = zip.folder(app.name.replace(/[\\/:*?"<>|]/g, '_'));
+                appFolder.file('index.html', app.html);
+                const base64Data = app.icon.split(',')[1];
+                appFolder.file('icon.png', base64Data, { base64: true });
+            });
+
+            const content = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'app_runner_apps.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        importAppsButton.addEventListener('click', () => {
+            importFileInput.click();
+        });
+
+        importFileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            await handleImportFile(file);
+        });
+
+        // Drag and Drop Logic
+        document.body.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dragDropOverlay.style.display = 'flex';
+        });
+
+        document.body.addEventListener('dragleave', (event) => {
+            // Check if the drag leaves the body entirely, not just a child element
+            if (!event.relatedTarget || event.relatedTarget.nodeName === 'HTML') {
+                dragDropOverlay.style.display = 'none';
+            }
+        });
+
+        document.body.addEventListener('drop', async (event) => {
+            event.preventDefault();
+            dragDropOverlay.style.display = 'none';
+
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                // Assuming only one file is dropped at a time
+                const file = files[0];
+                await handleImportFile(file);
+            }
+        });
+
+
+        // --- Initialization ---
+
+        // Load apps from local storage on startup
+        window.onload = () => {
+            const savedApps = localStorage.getItem(localStorageKey);
+            if (savedApps) {
+                try {
+                    apps = JSON.parse(savedApps);
+                } catch (e) {
+                    console.error('Failed to parse saved apps', e);
+                    apps = [];
+                }
+            }
+            renderAppList();
+        };
+
+    </script>
+</body>
+</html>

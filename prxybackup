@@ -1,0 +1,235 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>v4l</title>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root{
+      --bg:#071018;
+      --card:rgba(255,255,255,0.04);
+      --muted:rgba(255,255,255,0.85);
+      --accent:#2196f3;
+      --accent-2:#64b5f6;
+      --glass-border:rgba(255,255,255,0.06);
+      --radius:14px;
+      --shadow:0 8px 30px rgba(8,7,16,0.6);
+      --glass-blur:12px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family:'Quicksand',system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+      background:linear-gradient(180deg,#031019 0%, #071022 60%);
+      color:var(--muted);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:32px;
+    }
+    .scene{
+      width:100%;
+      max-width:820px;
+      position:relative;
+      padding:32px;
+      display:flex;
+      flex-direction:column;
+      gap:28px;
+      align-items:stretch;
+    }
+    .brand{display:flex;gap:16px;align-items:center}
+    .logo{
+      width:64px;
+      height:64px;
+      border-radius:16px;
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-weight:700;
+      font-size:1.25rem;
+      box-shadow:0 6px 18px rgba(33,150,243,0.3);
+      flex-shrink:0;
+    }
+    .card{
+      background:var(--card);
+      border-radius:var(--radius);
+      padding:22px;
+      border:1px solid var(--glass-border);
+      backdrop-filter:blur(var(--glass-blur));
+      box-shadow:var(--shadow);
+    }
+    .search-panel{padding:28px;display:flex;flex-direction:column;gap:18px}
+    h1{color:var(--accent-2);font-size:1.6rem;margin-bottom:4px}
+    .subtitle{color:var(--muted);font-size:0.95rem;line-height:1.3}
+    form{display:flex;gap:12px;align-items:center}
+    .url-input{
+      flex:1;
+      min-height:48px;
+      padding:12px 14px;
+      border-radius:12px;
+      background:transparent;
+      color:#fff;
+      border:1px solid rgba(255,255,255,0.06);
+      outline:none;
+      font-size:1rem;
+      box-shadow:inset 0 -6px 18px rgba(0,0,0,0.35);
+      transition:box-shadow .18s, border-color .18s, transform .12s;
+    }
+    .url-input:focus{
+      border-color:var(--accent);
+      box-shadow:0 6px 28px rgba(33,150,243,0.2);
+      transform:translateY(-1px);
+    }
+    .controls{display:flex;gap:8px;align-items:center}
+    .btn{
+      background:linear-gradient(180deg,var(--accent),var(--accent-2));
+      border:none;
+      color:#fff;
+      padding:10px 14px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+      min-width:44px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      box-shadow:0 8px 20px rgba(33,150,243,0.25);
+      transition:transform .12s, box-shadow .18s;
+    }
+    .btn:hover{box-shadow:0 8px 28px rgba(33,150,243,0.35)}
+    .btn:active{transform:translateY(1px)}
+    .ghost{
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.06);
+      color:var(--muted);
+      padding:10px 12px;
+      border-radius:10px;
+      cursor:pointer;
+      transition:border-color .18s, color .18s;
+    }
+    .ghost:hover{border-color:var(--accent-2);color:#fff}
+    .meta{display:flex;gap:10px;align-items:center;font-size:0.88rem;color:rgba(255,255,255,0.55)}
+    .quick-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+    .quick{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding:8px 12px;
+      border-radius:10px;
+      background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);
+      border:1px solid rgba(255,255,255,0.04);
+      cursor:pointer;
+      color:var(--muted);
+      font-size:0.95rem;
+      transition:transform .12s, box-shadow .12s, color .18s;
+    }
+    .quick:hover{
+      transform:translateY(-4px);
+      box-shadow:0 8px 24px rgba(0,0,0,0.45);
+      color:#fff;
+    }
+    .petals-bg{
+      position:fixed;
+      inset:0;
+      background-image:url('https://raw.githubusercontent.com/maliboot/petal-bg/main/petals-light.svg');
+      opacity:0.05;
+      pointer-events:none;
+      z-index:-1;
+      background-repeat:repeat;
+      background-size:600px;
+      animation:scroll 90s linear infinite;
+    }
+    @keyframes scroll{
+      from{background-position:0 0}
+      to{background-position:0 1200px}
+    }
+    @media (max-width:880px){.scene{padding:20px}}
+  </style>
+</head>
+<body>
+  <div class="petals-bg"></div>
+  <main class="scene">
+    <section class="card search-panel">
+      <div class="brand">
+        <div class="logo">v4l</div>
+        <div>
+          <h1>v4l</h1>
+          <div class="subtitle">Enter a URL or a search term — press Enter or click Open to load.</div>
+        </div>
+      </div>
+      <form id="navForm">
+        <input id="query" class="url-input" autocomplete="off" type="search" placeholder="https://example.com or search terms">
+        <div class="controls">
+          <button id="openBtn" class="btn" type="submit"><i class="fa-solid fa-up-right-from-square"></i>Open</button>
+          <button id="clearBtn" class="ghost" type="button">Clear</button>
+        </div>
+      </form>
+      <div class="meta">
+        <div>Quick links</div>
+        <div style="flex:1"></div>
+        <div id="status">Ready</div>
+      </div>
+      <div class="quick-links">
+        <button class="quick" data-url="https://www.youtube.com"><i class="fa-brands fa-youtube"></i>Youtube</button>
+        <button class="quick" data-url="https://now.gg"><i class="fa-solid fa-gamepad"></i>Now.gg</button>
+        <button class="quick" data-url="https://duckduckgo.com/"><i class="fa-solid fa-globe"></i>DuckDuck GO</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    function go(url) {
+      location.href = `/s/embed.html#${url}`;
+    }
+    const form = document.getElementById('navForm');
+    const input = document.getElementById('query');
+    const status = document.getElementById('status');
+    const quicks = document.querySelectorAll('.quick');
+    function looksLikeDomain(v){return /^[\w-]+(\.[\w-]+)+.*$/i.test(v);}
+    function hasProtocol(v){return /^(https?|file|ftp):\/\//i.test(v);}
+    function buildUrl(raw){
+      const t = raw.trim();
+      if (!t) return null;
+      if (hasProtocol(t)) return t;
+      if (looksLikeDomain(t)) return 'https://' + t;
+      return 'https://duckduckgo.com/search?q=' + encodeURIComponent(t);
+    }
+    form.addEventListener('submit', e=>{
+      e.preventDefault();
+      const url = buildUrl(input.value || '');
+      if (!url) return;
+      status.textContent = 'Opening…';
+      go(url);
+    });
+    document.getElementById('clearBtn').addEventListener('click', ()=>{
+      input.value = '';
+      input.focus();
+      status.textContent = 'Cleared';
+      setTimeout(()=>status.textContent = 'Ready', 800);
+    });
+    quicks.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        go(btn.dataset.url);
+      });
+    });
+    input.addEventListener('keydown', e=>{
+      if (e.key === 'Escape') {
+        input.value = '';
+        status.textContent = 'Cleared';
+        setTimeout(()=>status.textContent = 'Ready', 800);
+      }
+    });
+    window.addEventListener('keydown', e=>{
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        input.focus();
+        input.select();
+      }
+    });
+  </script>
+</body>
+</html>

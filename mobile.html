@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>V4l OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1/dist/phosphor.js"></script>
+
+    <style>
+        /* Base styles for iPhone-like look */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: url('bg.png'); /* Default background image */
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center center;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            color: #333; /* Default text color for light mode */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            transition: background-color 0.3s ease;
+            display: grid;
+            grid-template-rows: auto 1fr auto; /* Status bar, main content, dock */
+            overflow: hidden; /* Prevent body scroll, content will scroll */
+        }
+
+        /* Dark mode styles */
+        body[data-theme="dark"] {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            background-blend-mode: overlay;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        /* iPhone Status Bar (Top) */
+        .status-bar {
+            background-color: rgba(255, 255, 255, 0.15); /* Subtle transparent background */
+            backdrop-filter: blur(8px);
+            padding: 8px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff; /* White text for contrast on transparent bar */
+            z-index: 1001; /* Ensure it's on top */
+            position: sticky;
+            top: 0;
+            width: 100%;
+            box-sizing: border-box;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3); /* Subtle shadow for text readability */
+        }
+        body[data-theme="dark"] .status-bar {
+            background-color: rgba(0, 0, 0, 0.2);
+            color: #e0e0e0;
+        }
+        .status-bar-left, .status-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* iPhone Dock (Bottom) */
+        .dock {
+            background-color: rgba(255, 255, 255, 0.25); /* Translucent white */
+            backdrop-filter: blur(25px); /* Stronger blur for dock */
+            border-radius: 20px; /* More rounded for iPhone dock */
+            padding: 10px 15px;
+            margin: 0 15px 15px; /* Margin from sides and bottom */
+            display: flex;
+            justify-content: space-around; /* Distribute items evenly */
+            align-items: center;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+            flex-shrink: 0; /* Prevent dock from shrinking */
+        }
+
+        body[data-theme="dark"] .dock {
+            background-color: rgba(0, 0, 0, 0.35);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Dock item styling */
+        .dock-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.1s ease-out;
+            text-align: center;
+            width: 60px; /* Fixed width for dock items */
+            height: 60px; /* Fixed height for dock items */
+            border-radius: 12px; /* Slight rounding for dock icons */
+            flex-shrink: 0;
+            background-color: transparent; /* No background for dock icons */
+        }
+
+        .dock-item:active {
+            transform: scale(0.9); /* Subtle press effect */
+        }
+
+        .dock-item .dock-icon-img {
+            width: 50px; /* Icon size on dock */
+            height: 50px;
+            object-fit: contain;
+            border-radius: 12px; /* Match dock item border-radius */
+        }
+        .dock-item .phosphor-icon {
+            font-size: 40px; /* Larger icon size for Phosphor icons on dock */
+            color: #4A4A4A;
+            transition: color 0.3s ease;
+        }
+        body[data-theme="dark"] .dock-item .phosphor-icon {
+            color: #cccccc;
+        }
+
+        /* Homepage Grid for Apps */
+        .homepage-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 4 columns for apps */
+            gap: 15px 5px; /* Vertical and horizontal gap between app icons */
+            padding: 20px 15px 100px; /* Padding, extra space at bottom for dock visibility */
+            overflow-y: auto; /* Allow scrolling for app icons */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            align-content: flex-start; /* Align content to the top */
+            flex-grow: 1; /* Take remaining space */
+            justify-items: center; /* Center items in their grid cells */
+        }
+
+        /* App Icon Styling (on homepage) */
+        .app-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #fff; /* White text for app labels */
+            font-size: 12px;
+            font-weight: 500;
+            text-align: center;
+            transition: transform 0.1s ease-out;
+            width: 70px; /* Fixed width to ensure consistent spacing */
+        }
+        body[data-theme="dark"] .app-icon {
+            color: #e0e0e0;
+        }
+
+        .app-icon:active {
+            transform: scale(0.9); /* Subtle press effect */
+        }
+
+        .app-icon img {
+            width: 60px; /* Standard iPhone app icon size */
+            height: 60px;
+            object-fit: cover;
+            border-radius: 15px; /* More rounded corners for app icons (squircle) */
+            margin-bottom: 5px; /* Space between icon and label */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Stronger shadow for icons */
+        }
+        /* Fallback Phosphor icons for app-icon */
+        .app-icon .phosphor-icon {
+            font-size: 50px; /* Slightly smaller than img to fit the box */
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 15px;
+            color: #666; /* Default grey for fallback icons */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        body[data-theme="dark"] .app-icon .phosphor-icon {
+            color: #ccc;
+        }
+
+
+        .app-icon .app-title {
+            word-break: break-word;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%; /* Ensure title takes full width for ellipsis */
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5); /* Shadow for text readability */
+        }
+
+        /* Full-screen app window (modal style) */
+        .app-window {
+            background-color: rgba(255, 255, 255, 0.95); /* Nearly opaque white for app content */
+            backdrop-filter: blur(20px);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2000; /* Above everything else */
+            display: flex;
+            flex-direction: column;
+            transform: translateY(100%); /* Start off-screen below */
+            transition: transform 0.3s ease-out;
+            overflow: hidden; /* Hide scrollbars for the window itself */
+        }
+        body[data-theme="dark"] .app-window {
+            background-color: rgba(20, 20, 20, 0.95);
+        }
+
+        .app-window.active {
+            transform: translateY(0); /* Slide up into view */
+        }
+
+        .app-window-title-bar {
+            background-color: rgba(255, 255, 255, 0.1); /* Subtle transparent background */
+            color: #333;
+            font-weight: 600;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+        body[data-theme="dark"] .app-window-title-bar {
+            background-color: rgba(0, 0, 0, 0.1);
+            color: #e0e0e0;
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .app-window-close-button {
+            background: none;
+            border: none;
+            color: #007aff; /* iOS blue tint */
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        body[data-theme="dark"] .app-window-close-button {
+            color: #55aaff;
+        }
+
+        .app-window-content {
+            flex-grow: 1;
+            overflow-y: auto; /* Allow content to scroll */
+            -webkit-overflow-scrolling: touch;
+            padding: 15px;
+            transition: color 0.3s ease;
+        }
+
+        /* Generic hidden class */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Specific styles for elements within app windows */
+        h1, h2, p {
+            color: #333; /* Darker text */
+            transition: color 0.3s ease;
+        }
+        body[data-theme="dark"] h1, body[data-theme="dark"] h2, body[data-theme="dark"] p {
+            color: #e0e0e0;
+        }
+        h1 { font-size: 28px; margin-bottom: 15px; font-weight: 600; }
+        h2 { font-size: 22px; margin-bottom: 10px; font-weight: 600; }
+        p { font-size: 15px; margin-bottom: 10px; }
+
+        .modern-button {
+            background-color: #007aff; /* iOS blue button */
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 18px;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0, 122, 255, 0.2);
+            transition: background-color 0.2s ease-out, box-shadow 0.2s ease-out;
+        }
+        body[data-theme="dark"] .modern-button {
+            background-color: #55aaff;
+            box-shadow: 0 2px 5px rgba(85, 170, 255, 0.3);
+        }
+        .modern-button:active {
+            background-color: #005bb5;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        body[data-theme="dark"] .modern-button:active {
+            background-color: #4488ee;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        .modern-input {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, background-color 0.3s ease, color 0.3s ease;
+            color: #333;
+            width: 100%; /* Ensure input takes full width */
+            margin-bottom: 15px;
+        }
+        body[data-theme="dark"] .modern-input {
+            background-color: #2e2e2e;
+            border-color: #555;
+            color: #e0e0e0;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        .modern-input:focus {
+            border-color: #007aff;
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+        }
+
+        .button-container {
+            display: flex;
+            flex-direction: column; /* Stack buttons vertically on mobile */
+            gap: 12px;
+            margin-bottom: 25px;
+            width: 100%;
+        }
+        .info-link {
+            flex-grow: 1;
+            width: 100%; /* Full width for links */
+        }
+    </style>
+</head>
+<body>
+    <div class="status-bar" id="statusBar">
+        <div class="status-bar-left">
+            <span id="currentTime"></span>
+        </div>
+        <div class="status-bar-right">
+            <i class="ph-bold ph-wifi" style="font-size: 1.1em;"></i>
+            <i class="ph-bold ph-battery-full" style="font-size: 1.1em;"></i>
+        </div>
+    </div>
+
+    <div class="homepage-grid" id="homepageGrid">
+        </div>
+
+    <div class="dock" id="mainDock">
+        </div>
+
+    <div class="app-window" id="welcomeWindow">
+        <div class="app-window-title-bar">
+            <button class="app-window-close-button" onclick="closeApp('welcomeWindow')">Done</button>
+            <span class="title-text">Welcome to V4l!</span>
+            <span></span></div>
+        <div class="app-window-content text-center flex flex-col justify-between items-center h-full">
+            <h1>Welcome to V4l!</h1>
+            <p>Hello! This is a modern take on a classic game portal.</p>
+            <div class="button-container">
+                <a href="https://forms.gle/vZiTZZ97Qngp52bW8" class="info-link modern-button" target="_blank">Submit a game</a>
+                <a href="https://forms.gle/D76Teo8VL2Kw46kg6" class="info-link modern-button" target="_blank">Feedback</a>
+            </div>
+            <p class="text-sm text-gray-600 mt-auto">Most of the games were ported to html by 3hk0</p>
+        </div>
+    </div>
+
+    <div class="app-window" id="settingsWindow">
+        <div class="app-window-title-bar">
+            <button class="app-window-close-button" onclick="closeApp('settingsWindow')">Done</button>
+            <span class="title-text">Settings</span>
+            <span></span>
+        </div>
+        <div class="app-window-content flex flex-col gap-4">
+            <h2 class="text-xl font-semibold">Appearance</h2>
+            <div class="flex items-center justify-between p-2 rounded-lg bg-gray-100 dark:bg-gray-800 transition-colors">
+                <span>Dark Mode:</span>
+                <button id="darkModeToggle" class="modern-button">Toggle</button>
+            </div>
+
+            <h2 class="text-xl font-semibold mt-4">Background</h2>
+            <div class="flex items-center justify-between p-2 rounded-lg bg-gray-100 dark:bg-gray-800 transition-colors">
+                <span>Upload Custom Background:</span>
+                <input type="file" id="bgUploadInput" accept="image/*" class="modern-input">
+            </div>
+            <div class="flex items-center justify-between p-2 rounded-lg bg-gray-100 dark:bg-gray-800 transition-colors">
+                <span>Reset to Default Background:</span>
+                <button id="resetBgButton" class="modern-button">Reset</button>
+            </div>
+            
+            <h2 class="text-xl font-semibold mt-4">Other Settings</h2>
+            <p class="text-gray-700 dark:text-gray-400">More settings options will be added here in the future.</p>
+        </div>
+    </div>
+
+    <div class="app-window" id="allAppsWindow">
+        <div class="app-window-title-bar">
+            <button class="app-window-close-button" onclick="closeApp('allAppsWindow')">Done</button>
+            <span class="title-text">App Library</span>
+            <span></span>
+        </div>
+        <div class="app-window-content">
+            <input type="text" id="search-bar" class="modern-input" onkeyup="filterApps()" placeholder="Search apps...">
+            
+            <div class="homepage-grid" id="allAppsContainer">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_BG = 'bg.png';
+        const DEFAULT_DARK_MODE = false;
+        const MAX_DOCK_APPS = 4; // Max apps on iPhone dock
+
+        // Define all your apps here. `id` should be unique.
+        // `type`: 'system', 'internal-app', 'external-app'
+        // 'system': apps like Welcome, Settings that have their own modal-like windows.
+        // 'internal-app': apps like V4Ltext, V4LPaint that open in a new tab but are part of the "OS".
+        // 'external-app': games or other external links that open in a new tab.
+        const allAppsData = [
+            { id: 'welcomeWindow', name: 'Welcome', icon: 'osico/welcome.png', type: 'system' }, // Using 'welcome.png' now
+            { id: 'settingsWindow', name: 'Settings', icon: 'osico/settings.png', type: 'system' },
+            { id: 'allAppsWindow', name: 'App Library', icon: 'osico/applibrary.png', type: 'system' }, // Renamed from Launchpad, changed icon
+            { id: 'finder', name: 'Files', icon: 'osico/finder.png', type: 'internal-app', url: '#' }, // Placeholder for a file manager
+            { id: 'v4lText', name: 'V4Ltext', icon: 'osico/v4ltext.png', url: 'text.html', type: 'internal-app' },
+            { id: 'v4lPaint', name: 'V4LPaint', icon: 'osico/v4lpaintd.png', url: 'paint.html', type: 'internal-app' },
+            { id: 'windows', name: 'Windows', icon: 'osico/windows.png', url: '/win10', type: 'external-app' },
+            { id: '1v1space', name: '1v1space', icon: '/projects/1v1space/1v1space.jpg', url: '/projects/1v1space/index.html', type: 'external-app' },
+            { id: '2048', name: '2048', icon: '/projects/2048/2048.jpg', url: '/projects/2048/index.html', type: 'external-app' },
+            { id: '8ball', name: '8ball', icon: '/projects/8ball/8ball.jpg', url: '/projects/8ball/index.html', type: 'external-app' },
+            { id: '9007199254740992', name: '9007199254740992', icon: '/projects/9007199254740992/9007199254740992.jpg', url: '/projects/9007199254740992/index.html', type: 'external-app' },
+            { id: 'BTD4', name: 'BTD4', icon: '/projects/BTD4/BTD4.jpg', url: '/projects/BTD4/index.html', type: 'external-app' },
+            { id: 'Bitlife', name: 'Bitlife', icon: '/projects/Bitlife/Bitlife.jpg', url: '/projects/Bitlife/index.html', type: 'external-app' },
+            { id: 'Bloxorz', name: 'Bloxorz', icon: '/projects/Bloxorz/Bloxorz.jpg', url: '/projects/Bloxorz/index.html', type: 'external-app' },
+            { id: 'Chess', name: 'Chess', icon: '/projects/Chess/Chess.jpg', url: '/projects/Chess/index.html', type: 'external-app' },
+            { id: 'DogeMiner', name: 'DogeMiner', icon: '/projects/DogeMiner/DogeMiner.jpg', url: '/projects/DogeMiner/index.html', type: 'external-app' },
+            { id: 'Henrystickman', name: 'Henrystickman', icon: '/projects/Henrystickman/Henrystickman.jpg', url: '/projects/Henrystickman/index.html', type: 'external-app' },
+            { id: 'HexGL', name: 'HexGL', icon: '/projects/HexGL/index.html', url: '/projects/HexGL/index.html', type: 'external-app' },
+            { id: 'L2F2', name: 'L2F2', icon: '/projects/L2F2/L2F2.jpg', url: '/projects/L2F2/index.html', type: 'external-app' },
+            { id: 'L2F3', name: 'L2F3', icon: '/projects/L2F3/L2F3.jpg', url: '/projects/L2F3/index.html', type: 'external-app' },
+            { id: 'Minecraft', name: 'Minecraft', icon: '/projects/Minecraft/Minecraft.jpg', url: '/projects/Minecraft/index.html', type: 'external-app' },
+            { id: 'OT', name: 'OT', icon: '/projects/OT/OT.jpg', url: '/projects/OT/index.html', type: 'external-app' },
+            { id: 'PE', name: 'PE', icon: '/projects/PE/PE.jpg', url: '/projects/PE/index.html', type: 'external-app' },
+            { id: 'SandboxelsOLD', name: 'SandboxelsOLD', icon: '/projects/SandboxelsOLD/SandboxelsOLD.jpg', url: '/projects/SandboxelsOLD/index.html', type: 'external-app' },
+            { id: 'Subway', name: 'Subway', icon: '/projects/Subway/Subway.jpg', url: '/projects/Subway/index.html', type: 'external-app' },
+            { id: 'TIO', name: 'TIO', icon: '/projects/TIO/TIO.jpg', url: '/projects/TIO/index.html', type: 'external-app' },
+            // Add more apps here following the same structure
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            updateTime();
+            setInterval(updateTime, 1000); // Update time every second
+
+            populateHomepageApps(); // Populate the main homepage grid
+            updateDock(); // Populate the dock with recent apps
+            
+            // Open the welcome window automatically on first load, or if not seen before
+            if (localStorage.getItem('hasSeenWelcome') !== 'true') {
+                openApp('welcomeWindow');
+                localStorage.setItem('hasSeenWelcome', 'true');
+            }
+            
+            // Dark Mode Toggle
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            if (darkModeToggle) {
+                darkModeToggle.addEventListener('click', toggleDarkMode);
+            }
+
+            // Custom Background Upload
+            const bgUploadInput = document.getElementById('bgUploadInput');
+            if (bgUploadInput) {
+                bgUploadInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            document.body.style.backgroundImage = `url('${e.target.result}')`;
+                            localStorage.setItem('customBackground', e.target.result);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+
+            // Reset Background
+            const resetBgButton = document.getElementById('resetBgButton');
+            if (resetBgButton) {
+                resetBgButton.addEventListener('click', () => {
+                    document.body.style.backgroundImage = `url('${DEFAULT_BG}')`;
+                    localStorage.removeItem('customBackground');
+                });
+            }
+        });
+
+        function updateTime() {
+            const now = new Date();
+            const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', timeOptions);
+        }
+
+        function loadSettings() {
+            const isDarkMode = localStorage.getItem('darkMode') === 'true';
+            document.body.dataset.theme = isDarkMode ? 'dark' : 'light';
+
+            const customBackground = localStorage.getItem('customBackground');
+            if (customBackground) {
+                document.body.style.backgroundImage = `url('${customBackground}')`;
+            } else {
+                document.body.style.backgroundImage = `url('${DEFAULT_BG}')`;
+            }
+        }
+
+        function toggleDarkMode() {
+            const isDarkMode = document.body.dataset.theme === 'dark';
+            document.body.dataset.theme = isDarkMode ? 'light' : 'dark';
+            localStorage.setItem('darkMode', !isDarkMode);
+        }
+
+        function handleImageError(imageElement, fallbackIconClass, isDock = false) {
+            imageElement.onerror = null; // Prevent infinite loop
+            const parent = imageElement.parentElement;
+            const appName = parent.querySelector('.app-title')?.textContent || 'App';
+            console.warn(`Image failed to load for ${appName}. Using fallback icon.`);
+
+            const iconElement = document.createElement('i');
+            iconElement.classList.add('ph-fill', fallbackIconClass || 'ph-app-window'); // Default to a general app icon
+            
+            if (isDock) {
+                iconElement.classList.add('phosphor-icon'); // Apply dock-specific icon styles
+            } else {
+                // Apply app-icon specific styles for consistency
+                iconElement.classList.add('phosphor-icon'); // Use generic phosphor-icon for styling uniformity
+                iconElement.style.fontSize = '50px'; // Matching the size of app images
+                iconElement.style.color = '#666'; // Default color for icons
+                iconElement.style.display = 'flex';
+                iconElement.style.alignItems = 'center';
+                iconElement.style.justifyContent = 'center';
+                iconElement.style.width = '60px';
+                iconElement.style.height = '60px';
+                iconElement.style.borderRadius = '15px';
+                iconElement.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.2)';
+            }
+            
+            imageElement.replaceWith(iconElement);
+        }
+
+        // Functions to open and close app windows (now full-screen modals)
+        function openApp(appId) {
+            const appWindow = document.getElementById(appId);
+            if (appWindow) {
+                appWindow.classList.remove('hidden');
+                document.body.style.overflow = 'hidden'; // Prevent scrolling body when app is open
+                setTimeout(() => { // Trigger transition after display is set
+                    appWindow.classList.add('active');
+                }, 10);
+                addRecentApp(appId); // Add to recent when opened
+            }
+        }
+
+        function closeApp(appId) {
+            const appWindow = document.getElementById(appId);
+            if (appWindow) {
+                appWindow.classList.remove('active');
+                setTimeout(() => { // Hide after transition
+                    appWindow.classList.add('hidden');
+                    document.body.style.overflow = ''; // Re-enable body scroll
+                    appWindow.scrollTop = 0; // Reset scroll position
+                }, 300); // Match CSS transition duration
+            }
+        }
+
+        // --- Dock and Homepage App Management ---
+        function getRecentAppIds() {
+            try {
+                const recent = JSON.parse(localStorage.getItem('recentAppIds')) || [];
+                return recent;
+            } catch (e) {
+                console.error("Failed to parse recentAppIds from localStorage:", e);
+                return [];
+            }
+        }
+
+        function addRecentApp(appId) {
+            // Only add 'internal-app' and 'external-app' types to the dock's recent list
+            const app = allAppsData.find(a => a.id === appId);
+            if (!app || app.type === 'system') {
+                return; // System apps are not managed by recent apps for the dock
+            }
+
+            let recentAppIds = getRecentAppIds();
+            
+            // Remove if already exists to move to front
+            recentAppIds = recentAppIds.filter(id => id !== appId);
+            
+            // Add to the beginning
+            recentAppIds.unshift(appId);
+            
+            // Keep only the last MAX_DOCK_APPS
+            localStorage.setItem('recentAppIds', JSON.stringify(recentAppIds.slice(0, MAX_DOCK_APPS)));
+            updateDock(); // Re-render the dock
+        }
+
+        function updateDock() {
+            const mainDock = document.getElementById('mainDock');
+            mainDock.innerHTML = ''; // Clear current dock
+
+            const recentAppIds = getRecentAppIds();
+
+            recentAppIds.forEach(appId => {
+                const app = allAppsData.find(a => a.id === appId);
+                if (app) { // Ensure the app data exists
+                    const dockItem = document.createElement('div');
+                    dockItem.classList.add('dock-item');
+                    dockItem.id = `${app.id}DockItem`; // Assign an ID
+
+                    let iconHtml = `<img src="${app.icon}" onerror="handleImageError(this, 'ph-app-window', true)" alt="${app.name} Icon" class="dock-icon-img">`;
+                    dockItem.innerHTML = iconHtml;
+
+                    dockItem.addEventListener('click', (event) => {
+                        event.preventDefault(); // Prevent default link behavior for dock items
+                        if (app.type === 'system') {
+                            openApp(app.id); // Open system apps (e.g., Welcome, Settings) as modals
+                        } else if (app.type === 'internal-app' || app.type === 'external-app') {
+                            window.open(app.url, '_blank'); // Open other apps/games in new tab
+                            addRecentApp(app.id); // Add to recent after opening
+                        }
+                    });
+                    mainDock.appendChild(dockItem);
+                }
+            });
+        }
+
+        function populateHomepageApps() {
+            const homepageGrid = document.getElementById('homepageGrid');
+            const allAppsContainer = document.getElementById('allAppsContainer'); // For the "App Library" search window
+            homepageGrid.innerHTML = '';
+            allAppsContainer.innerHTML = ''; // Clear for fresh populate
+
+            const recentAppIdsOnDock = getRecentAppIds();
+
+            allAppsData.forEach(app => {
+                const appIconLink = document.createElement('a');
+                appIconLink.classList.add('app-icon');
+                appIconLink.setAttribute('data-app-id', app.id);
+                
+                // Add event listener for app launch
+                appIconLink.addEventListener('click', (event) => {
+                    event.preventDefault(); // Prevent default link behavior for homepage icons
+                    if (app.type === 'system') {
+                        openApp(app.id); // Open system apps (e.g., Welcome, Settings, App Library) as modals
+                    } else if (app.type === 'internal-app' || app.type === 'external-app') {
+                        window.open(app.url, '_blank'); // Open other apps/games in new tab
+                        addRecentApp(app.id); // Add to recent after opening
+                    }
+                });
+
+                appIconLink.innerHTML = `
+                    <img src="${app.icon}" onerror="handleImageError(this, 'ph-app-window')" alt="${app.name} Icon">
+                    <div class="app-title">${app.name}</div>
+                `;
+                
+                homepageGrid.appendChild(appIconLink.cloneNode(true)); // Add to main homepage
+                allAppsContainer.appendChild(appIconLink.cloneNode(true)); // Also add to All Apps container for search
+            });
+        }
+
+        function filterApps() {
+            const searchBar = document.getElementById('search-bar');
+            const filter = searchBar.value.toLowerCase();
+            const appCards = document.querySelectorAll('#allAppsContainer .app-icon'); // Target all apps in the "App Library" window
+
+            appCards.forEach(card => {
+                const title = card.querySelector('.app-title').textContent.toLowerCase();
+                if (title.includes(filter)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

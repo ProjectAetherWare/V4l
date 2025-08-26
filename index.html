@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V4L</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom CSS variables for easy theming */
+        :root {
+            --grid-gap: 1.5rem;
+            --card-border-radius: 0.5rem;
+            --game-title-font-size: 0.9rem;
+            /* Apple Liquid Glass inspired colors - adjusted for dark mode, subtle effect */
+            --translucent-dark-bg: rgba(255, 255, 255, 0.15); /* Very light, highly transparent */
+            --translucent-lighter-bg: rgba(255, 255, 255, 0.08); /* Even more transparent for cards */
+            --translucent-input-bg: rgba(255, 255, 255, 0.1); /* Slightly more opaque for inputs */
+            --translucent-header-bg: rgba(255, 255, 255, 0.1); /* Lighter translucent for headers */
+            --card-shadow-active: 0 4px 15px rgba(0, 0, 0, 0.15); /* Softer, slightly wider shadow */
+            --hue-rotate-value: 0deg; /* Default hue rotation */
+        }
+
+        /* Base body styles */
+        body {
+            font-family: 'Montserrat', 'Inter', sans-serif;
+            background-color: transparent; /* Changed to transparent to show the dedicated background div */
+            color: #e2e8f0; /* Light text for better contrast on dark background */
+            min-height: 100vh;
+            display: flex;
+            margin: 0;
+            box-sizing: border-box;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            position: relative; /* Needed for absolute positioning of background div */
+            z-index: 1; /* Default z-index */
+        }
+
+        /* Dedicated background image container with the hue filter */
+        #backgroundImageWrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 0; /* Behind all other content */
+            transition: filter 0.3s ease;
+            filter: hue-rotate(var(--hue-rotate-value));
+        }
+
+        /* Main Launcher UI elements */
+        .main-content-wrapper {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Default for game library/homepage */
+            padding: 2rem; /* Default for game library/homepage */
+            box-sizing: border-box;
+            overflow-y: auto;
+            margin-left: 150px; /* Space for sidebar */
+            transition: margin-left 0.3s ease, padding 0.3s ease;
+            min-width: 0; /* Allows content to shrink */
+            z-index: 100; /* Ensure it's above body background, below modals/overlays */
+        }
+        .main-content-wrapper.sidebar-hidden {
+            margin-left: 0; /* Adjust margin when sidebar is hidden */
+        }
+        /* Adjust main content wrapper when a game is loaded to allow full screen */
+        .main-content-wrapper.game-loaded {
+            padding: 0;
+            align-items: stretch; /* Allow content to stretch horizontally */
+            overflow-y: hidden; /* Prevent scrolling on main wrapper when game is full screen */
+        }
+
+
+        /* Sidebar styles */
+        .sidebar {
+            width: 150px;
+            background-color: var(--translucent-dark-bg);
+            backdrop-filter: blur(30px); /* Increased blur for stronger liquid glass effect */
+            color: #e2e8f0; /* Light text for contrast */
+            padding: 1.5rem 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 2px 0 15px rgba(0, 0, 0, 0.2); /* Stronger, softer shadow */
+            border-right: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border */
+            position: fixed; /* Fixed position for sidebar */
+            top: 0;
+            left: 0;
+            height: 100%;
+            z-index: 100; /* Normal state z-index */
+            transition: transform 0.3s ease;
+        }
+        .sidebar.hidden {
+            transform: translateX(-100%); /* Hide sidebar by moving it off-screen */
+        }
+        /* Specific z-index for sidebar when it's meant to overlay the game content */
+        .sidebar.overlay-active {
+            z-index: 3000;
+        }
+
+        /* Sidebar logo styling - V4L text with blue gradient */
+        .sidebar-logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            background: linear-gradient(to right, #4a90e2, #7aaee2, #a7d9f7); /* Blue gradient */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent; /* Fallback for non-webkit browsers */
+            /* This filter is now the ONLY one affecting the logo, so it will work correctly */
+            filter: hue-rotate(var(--hue-rotate-value));
+        }
+        /* Sidebar navigation item styling */
+        .sidebar-nav-item {
+            display: block;
+            width: 100%;
+            padding: 0.75rem 0;
+            text-align: center;
+            color: #e2e8f0; /* Light text for contrast */
+            text-decoration: none;
+            font-weight: 600;
+            transition: background-color 0.2s ease, transform 0.2s ease; /* Added transform transition */
+            border-radius: 0.25rem; /* Added for subtle rounding */
+            margin: 0.25rem 0; /* Spacing between items */
+        }
+        .sidebar-nav-item:hover {
+            background-color: rgba(255, 255, 255, 0.15); /* Slightly more opaque on hover */
+            transform: rotate(3deg); /* Subtle rotation on hover */
+        }
+
+        /* Sidebar Toggle Button (Main Launcher) */
+        .sidebar-toggle-btn {
+            position: fixed;
+            top: 50%;
+            left: 5px;
+            transform: translateY(-50%) rotate(0deg); /* Initial rotation */
+            background-color: var(--translucent-dark-bg);
+            backdrop-filter: blur(20px); /* Liquid glass blur */
+            color: #e2e8f0; /* Light text */
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 0.25rem;
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            z-index: 99; /* Below sidebar */
+            opacity: 0;
+            visibility: hidden;
+            transition: transform 0.3s ease, opacity 0.3s ease, left 0.3s ease, visibility 0.3s;
+        }
+        .sidebar-toggle-btn.visible {
+            opacity: 1;
+            visibility: visible;
+            left: 15px; /* Move slightly right when visible */
+        }
+        .sidebar-toggle-btn.sidebar-hidden-arrow {
+            transform: translateY(-50%) rotate(180deg); /* Rotate arrow when sidebar is hidden */
+        }
+
+        /* Search bar container styling */
+        .search-bar-container {
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 2rem;
+            background-color: var(--translucent-dark-bg);
+            backdrop-filter: blur(20px); /* Liquid glass blur */
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem; /* Reduced vertical padding */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15); /* Softer shadow */
+            border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border */
+        }
+        .search-bar-container input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #e2e8f0; /* Light text */
+            font-size: 1rem;
+            padding: 0; /* Removed input padding to control height via container */
+        }
+        .search-bar-container input::placeholder {
+            color: #cbd5e0; /* Lighter placeholder */
+            opacity: 0.7;
+        }
+
+        /* Game grid layout */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* Responsive grid columns */
+            gap: var(--grid-gap);
+            max-width: 1200px;
+            width: 100%;
+            padding: 1.5rem;
+            background-color: transparent; /* Make grid background transparent to show body background */
+            backdrop-filter: none; /* No blur on grid background itself */
+            border-radius: 0.75rem;
+            box-shadow: none; /* No shadow on grid container */
+            border: none; /* No border on grid container */
+            flex-grow: 1; /* Allow grid to grow and fill space */
+            overflow-y: auto; /* Enable scrolling for the grid itself */
+        }
+        /* Game card styling */
+        .game-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            text-decoration: none;
+            color: inherit;
+            background-color: transparent; /* Removed card background */
+            backdrop-filter: none; /* Removed card backdrop-filter */
+            border-radius: var(--card-border-radius);
+            padding: 0.75rem;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; /* Removed background-color transition */
+            box-shadow: none; /* Removed card shadow */
+            border: none; /* Removed card border */
+            height: 100%; /* Ensure cards take full height in their grid cell */
+            position: relative; /* For pin button positioning */
+        }
+        .game-card:hover {
+            transform: rotate(3deg); /* Subtle rotation on hover */
+            box-shadow: none; /* No shadow on hover for the card itself */
+        }
+        .game-card img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 0.25rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .game-card-title {
+            font-size: var(--game-title-font-size);
+            font-weight: 600;
+            line-height: 1.2;
+            word-break: break-word;
+            flex-grow: 1; /* Allow title to take available space */
+            color: #e2e8f0; /* Light text */
+            /* No padding, background, blur on this div directly */
+        }
+        /* Styling for the text background within game card titles */
+        .game-card-title-text-bg {
+            background-color: rgba(0, 0, 0, 0.2); /* Slightly transparent background for text */
+            backdrop-filter: blur(5px); /* Subtle blur for the text background */
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            display: inline-block; /* Ensures padding and background apply correctly */
+        }
+        /* Style for unicode fallback icon */
+        .game-card .fallback-icon {
+            font-size: 80px; /* Adjust size as needed */
+            line-height: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100px;
+            height: 100px;
+            margin-bottom: 0.75rem;
+            color: #4a90e2; /* Blue color for the icon */
+            background-color: rgba(255, 255, 255, 0.05); /* Very subtle background for the icon area */
+            border-radius: 0.25rem;
+        }
+
+
+        /* Main heading styling */
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1); /* Softer text shadow */
+            color: #e2e8f0; /* Light text */
+        }
+
+        /* Container for loaded game iframe */
+        #gameContentContainer {
+            width: 100%;
+            height: 100%; /* Take full height of main content wrapper */
+            display: flex; /* Use flex to allow iframe to fill */
+            flex-direction: column;
+            background-color: #000; /* Black background for games */
+            border-radius: 0.75rem;
+            overflow: hidden; /* Ensure iframe content is clipped */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            display: none; /* Hidden by default */
+        }
+        #gameContentContainer iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: #000;
+        }
+
+        /* Pin button on game cards */
+        .pin-button {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(255, 255, 255, 0.3);
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1rem;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 10; /* Above image */
+        }
+        .pin-button:hover {
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+        .pin-button.pinned {
+            color: #fcd34d; /* Yellow for pinned state */
+        }
+        .pin-button.unpinned {
+            color: #fff; /* White for unpinned state */
+        }
+
+        /* Homepage specific styles */
+        .homepage-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1200px;
+            padding: 1.5rem;
+            background-color: var(--translucent-dark-bg);
+            backdrop-filter: blur(30px);
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            flex-grow: 1;
+        }
+        .homepage-content h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: #e2e8f0;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .time-display {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #4a90e2; /* Blue color for time */
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .pinned-games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: var(--grid-gap);
+            width: 100%;
+            padding: 1rem 0;
+        }
+        .pinned-games-grid .game-card {
+            /* Inherits game-card styles */
+        }
+
+
+        /* Modal Overlay Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0.3s, opacity 0.3s;
+        }
+        .modal-overlay.open {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-content {
+            background-color: var(--translucent-dark-bg);
+            backdrop-filter: blur(30px); /* Stronger blur for modals */
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4); /* Stronger, softer shadow */
+            border: 1px solid rgba(255, 255, 255, 0.15); /* Subtle border */
+            width: 90%;
+            max-width: 600px; /* Increased max-width for tabs */
+            color: #e2e8f0; /* Light text */
+            display: flex; /* Use flex for internal layout */
+            flex-direction: column;
+        }
+        .modal-content h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: #4a90e2; /* Blue for modal headings */
+        }
+
+        /* Settings Tabs Styling */
+        .tab-navigation {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .tab-button {
+            padding: 0.75rem 1.25rem;
+            background-color: transparent;
+            border: none;
+            color: #cbd5e0; /* Lighter text for inactive tabs */
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.2s ease, background-color 0.2s ease, border-bottom 0.2s ease;
+            border-bottom: 3px solid transparent; /* For active indicator */
+            margin-right: 0.5rem; /* Spacing between tabs */
+        }
+        .tab-button:hover {
+            color: #e2e8f0; /* White on hover */
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .tab-button.active {
+            color: #4a90e2; /* Blue for active tab */
+            border-bottom: 3px solid #4a90e2; /* Blue underline for active tab */
+            background-color: rgba(255, 255, 255, 0.1); /* Slightly more opaque for active tab */
+        }
+        .tab-content {
+            display: none; /* Hidden by default */
+            flex-grow: 1; /* Allow content to fill space */
+            padding-top: 1rem;
+            overflow-y: auto; /* Enable scrolling for tab content if needed */
+        }
+        .tab-content.active {
+            display: block; /* Show active tab content */
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .form-group input[type="color"],
+        .form-group input[type="text"],
+        .form-group input[type="range"],
+        .form-group input[type="file"],
+        .form-group select {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid rgba(255, 255, 255, 0.3); /* Lighter border */
+            background-color: var(--translucent-input-bg);
+            color: #e2e8f0; /* Light text */
+            box-sizing: border-box;
+        }
+        .form-group input[type="color"] {
+            height: 40px;
+            padding: 0;
+            border: none;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem; /* Add padding to separate from tab content */
+            border-top: 1px solid rgba(255, 255, 255, 0.1); /* Subtle separator */
+        }
+        .modal-actions button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            color: #fff; /* White text for action buttons */
+        }
+        .modal-actions .save-button {
+            background-color: #4a90e2; /* Blue save button */
+        }
+        .modal-actions .save-button:hover {
+            background-color: #3182ce;
+        }
+        .modal-actions .close-button, .modal-actions .clear-bg-button {
+            background-color: rgba(255, 255, 255, 0.2); /* Translucent close button */
+            color: #e2e8f0; /* Light text for close/clear */
+        }
+        .modal-actions .close-button:hover, .modal-actions .clear-bg-button:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        .modal-actions .restore-defaults-button {
+            background-color: #ef4444; /* Red restore button */
+        }
+        .modal-actions .restore-defaults-button:hover {
+            background-color: #dc2626;
+        }
+
+        /* Custom Confirmation/Alert Modal */
+        .custom-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1002; /* Above settings modal */
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0.3s, opacity 0.3s;
+        }
+        .custom-modal-overlay.open {
+            visibility: visible;
+            opacity: 1;
+        }
+        .custom-modal-content {
+            background-color: var(--translucent-dark-bg);
+            backdrop-filter: blur(30px); /* Stronger blur */
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4); /* Stronger, softer shadow */
+            border: 1px solid rgba(255, 255, 255, 0.15); /* Subtle border */
+            width: 90%;
+            max-width: 400px;
+            color: #e2e8f0; /* Light text */
+            text-align: center;
+        }
+        .custom-modal-content p {
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+        }
+        .custom-modal-content .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        .custom-modal-content .modal-buttons button {
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            color: #fff; /* White text for buttons */
+        }
+        .custom-modal-content .modal-buttons .confirm-yes {
+            background-color: #4a90e2; /* Blue confirm button */
+        }
+        .custom-modal-content .modal-buttons .confirm-yes:hover {
+            background-color: #3182ce;
+        }
+        .custom-modal-content .modal-buttons .confirm-no,
+        .custom-modal-content .modal-buttons .alert-ok {
+            background-color: rgba(255, 255, 255, 0.2); /* Translucent buttons */
+            color: #e2e8f0; /* Light text */
+        }
+        .custom-modal-content .modal-buttons .confirm-no:hover,
+        .custom-modal-content .modal-buttons .alert-ok:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+
+        /* Chat Overlay Styles */
+        .chat-overlay {
+            position: fixed;
+            top: 0;
+            right: -350px; /* Hidden by default */
+            width: 350px;
+            height: 100%;
+            background-color: var(--translucent-dark-bg);
+            backdrop-filter: blur(30px); /* Liquid glass blur */
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.4);
+            border-left: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border */
+            z-index: 1001; /* Default z-index for chat */
+            transition: transform 0.3s ease-out;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-overlay.open {
+            transform: translateX(-350px); /* Slide in */
+        }
+        /* Specific z-index for chat when it's meant to overlay the game content */
+        .chat-overlay.overlay-active {
+            z-index: 3000;
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background-color: var(--translucent-header-bg);
+            backdrop-filter: blur(20px); /* Liquid glass blur */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2); /* Lighter border */
+        }
+        .chat-header h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #4a90e2; /* Blue for chat heading */
+        }
+        .chat-toggle-button {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #e2e8f0; /* Light text */
+            cursor: pointer;
+            padding: 0.25rem;
+            transition: color 0.2s ease;
+        }
+        .chat-toggle-button:hover {
+            color: #4a90e2; /* Blue on hover */
+        }
+        .chat-iframe-container {
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        .chat-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: transparent;
+        }
+
+
+        /* Visual Effects (Shaders) classes for body */
+        body.effect-grayscale #backgroundImageWrapper { filter: grayscale(100%) hue-rotate(var(--hue-rotate-value)); }
+        body.effect-sepia #backgroundImageWrapper { filter: sepia(100%) hue-rotate(var(--hue-rotate-value)); }
+        body.effect-invert #backgroundImageWrapper { filter: invert(100%) hue-rotate(var(--hue-rotate-value)); }
+        body.effect-heavy-blur #backgroundImageWrapper { filter: blur(5px) hue-rotate(var(--hue-rotate-value)); }
+
+
+        /* Mobile Controls Styling */
+        #mobileControlsOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2000; /* Higher than other overlays but below modals */
+            display: none; /* Hidden by default */
+            pointer-events: none; /* Allow clicks to pass through the overlay */
+        }
+
+        #mobileControlsOverlay.visible {
+            display: flex;
+        }
+
+        .mobile-controls-side {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 250px;
+            width: 250px;
+        }
+
+        .mobile-controls-side.left {
+            left: 5%;
+        }
+
+        .mobile-controls-side.right {
+            right: 5%;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            background-color: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 0.5rem; /* Rounded square background */
+            padding: 20px;
+            height: 180px;
+            width: 180px;
+        }
+
+        .d-pad-button {
+            pointer-events: auto; /* Re-enable clicks on the button */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 0.5rem; /* Square buttons with rounded corners */
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+            color: white;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s ease;
+        }
+
+        .d-pad-button:active,
+        .d-pad-button.active {
+            background-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .d-pad .placeholder {
+            visibility: hidden;
+        }
+
+        .jump-button {
+            pointer-events: auto; /* Re-enable clicks on the button */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(74, 144, 226, 0.7); /* Blue color for jump */
+            backdrop-filter: blur(10px);
+            border-radius: 50%;
+            width: 100px;
+            height: 100px;
+            font-size: 24px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .jump-button:active,
+        .jump-button.active {
+            background-color: rgba(54, 114, 196, 0.8);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            transform: translateY(2px);
+        }
+
+        /* Styles for the mobile controls switch in the sidebar */
+        .mobile-controls-toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+            padding: 0.75rem 0;
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+        .mobile-controls-toggle {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 24px;
+        }
+        .mobile-controls-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .mobile-controls-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .mobile-controls-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .mobile-controls-slider {
+            background-color: #4a90e2;
+        }
+        input:checked + .mobile-controls-slider:before {
+            transform: translateX(16px);
+        }
+
+    </style>
+</head>
+<body class="flex">
+    <!-- This div is now the only element with the background image and the hue filter -->
+    <div id="backgroundImageWrapper"></div>
+
+    <!-- Main Sidebar -->
+    <aside class="sidebar" id="mainSidebar">
+        <div class="sidebar-logo">V4L</div>
+        <nav class="flex flex-col w-full px-2">
+            <a href="#" class="sidebar-nav-item" id="homepageMenuLink">Homepage</a>
+            <a href="#" class="sidebar-nav-item" id="gamesMenuLink">Games Menu</a>
+            <a href="prxychoose.html" class="sidebar-nav-item" id="proxyMenuLink">Proxy</a>
+            <a href="html.html" class="sidebar-nav-item" id="htmlMenuLink">HTML</a>
+            <a href="/v4los.html" class="sidebar-nav-item">V4L OS</a>
+            <button id="openChatBtn" class="sidebar-nav-item">Chat</button>
+            <button id="openSettingsBtn" class="sidebar-nav-item">Settings</button>
+        </nav>
+        <!-- Mobile Controls Switch -->
+        <div class="mobile-controls-toggle-container mt-auto mb-2">
+            <span>Mobile Controls</span>
+            <label class="mobile-controls-toggle">
+                <input type="checkbox" id="mobileControlsSwitch">
+                <span class="mobile-controls-slider"></span>
+            </label>
+        </div>
+    </aside>
+
+    <!-- Sidebar Toggle Button for Main Launcher -->
+    <button id="sidebarToggleBtn" class="sidebar-toggle-btn">←</button>
+
+    <!-- Main Content Wrapper (Homepage / Game Library / Loaded Game) -->
+    <div id="mainContentWrapper" class="main-content-wrapper">
+        <!-- Homepage View -->
+        <div id="homepageView" class="homepage-content">
+            <div id="currentTime" class="time-display"></div>
+            <h2>My Pinned Games</h2>
+            <div id="pinnedGamesGrid" class="pinned-games-grid">
+                <!-- Pinned game cards will be populated here by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Game Library View -->
+        <div id="gameLibraryView" style="display: none; flex-direction: column; align-items: center; width: 100%;">
+            <h1>Game Library</h1>
+            <div class="search-bar-container">
+                <input type="text" id="gameSearchInput" placeholder="Search games...">
+            </div>
+            <div id="gameGrid" class="game-grid">
+                <!-- Game cards will be populated here by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Game Content Container (for loaded games) -->
+        <div id="gameContentContainer" style="display: none;">
+            <!-- Game iframe will be loaded here dynamically -->
+        </div>
+    </div>
+
+    <!-- Mobile Controls Overlay -->
+    <div id="mobileControlsOverlay">
+        <div class="mobile-controls-side left">
+            <div class="d-pad">
+                <button class="d-pad-button placeholder"></button>
+                <button class="d-pad-button" data-key="w">&#9650;</button>
+                <button class="d-pad-button placeholder"></button>
+
+                <button class="d-pad-button" data-key="a">&#9664;</button>
+                <button class="d-pad-button placeholder"></button>
+                <button class="d-pad-button" data-key="d">&#9654;</button>
+
+                <button class="d-pad-button placeholder"></button>
+                <button class="d-pad-button" data-key="s">&#9660;</button>
+                <button class="d-pad-button placeholder"></button>
+            </div>
+        </div>
+        <div class="mobile-controls-side right">
+            <button class="jump-button" data-key=" ">Jump</button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Settings</h2>
+            <div class="tab-navigation">
+                <button class="tab-button active" data-tab="appearance">Appearance</button>
+                <button class="tab-button" data-tab="visual-effects">Visual Effects</button>
+                <button class="tab-button" data-tab="background">Background</button>
+            </div>
+
+            <div id="appearanceSettingsTab" class="tab-content active">
+                <div class="form-group">
+                    <label for="bgColorInput">Background Color:</label>
+                    <input type="color" id="bgColorInput" value="#1a202c">
+                </div>
+                <div class="form-group">
+                    <label for="textColorInput">Text Color:</label>
+                    <input type="color" id="textColorInput" value="#e2e8f0">
+                </div>
+                <div class="form-group">
+                    <label for="gridGapInput">Grid Gap:</label>
+                    <input type="range" id="gridGapInput" min="0.5" max="3" step="0.1" value="1.5">
+                    <span id="gridGapValue">1.5rem</span>
+                </div>
+                <div class="form-group">
+                    <label for="gameTitleFontSizeInput">Game Title Font Size:</label>
+                    <input type="range" id="gameTitleFontSizeInput" min="0.7" max="1.2" step="0.05" value="0.9">
+                    <span id="gameTitleFontSizeValue">0.9rem</span>
+                </div>
+                <div class="form-group">
+                    <label for="cardBorderRadiusInput">Card Corner Roundness:</label>
+                    <input type="range" id="cardBorderRadiusInput" min="0" max="1.5" step="0.1" value="0.5">
+                    <span id="cardBorderRadiusValue">0.5rem</span>
+                </div>
+                <div class="form-group">
+                    <label for="cardBgColorInput">Card Background Color:</label>
+                    <input type="color" id="cardBgColorInput" value="rgba(255, 255, 255, 0.08)">
+                </div>
+                <div class="form-group">
+                    <label for="cardShadowInput">Card Shadow:</label>
+                    <select id="cardShadowInput">
+                        <option value="enabled">Enabled</option>
+                        <option value="disabled">Disabled</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="visual-effectsSettingsTab" class="tab-content">
+                <div class="form-group">
+                    <label for="visualEffectsInput">Visual Effects:</label>
+                    <select id="visualEffectsInput">
+                        <option value="none">None</option>
+                        <option value="grayscale">Grayscale</option>
+                        <option value="sepia">Sepia</option>
+                        <option value="invert">Invert Colors</option>
+                        <option value="heavy-blur">Heavy Blur</option>
+                    </select>
+                </div>
+                <!-- New Hue Slider -->
+                <div class="form-group">
+                    <label for="hueRotateInput">Hue Rotation:</label>
+                    <input type="range" id="hueRotateInput" min="0" max="360" step="1" value="0">
+                    <span id="hueRotateValue">0°</span>
+                </div>
+            </div>
+
+            <div id="backgroundSettingsTab" class="tab-content">
+                <div class="form-group">
+                    <label for="bgFileInput">Upload Custom Background Image (Max 15MB):</label>
+                    <input type="file" id="bgFileInput" accept="image/*">
+                    <button id="clearBgButton" class="clear-bg-button mt-2 block w-full">Clear Custom Background</button>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="restore-defaults-button" id="restoreDefaultsBtn">Restore Defaults</button>
+                <button class="save-button" id="saveSettingsBtn">Save Settings</button>
+                <button class="close-button" id="closeSettingsBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Overlay -->
+    <div id="chatOverlay" class="chat-overlay">
+        <div class="chat-header">
+            <h3>Chat</h3>
+            <button id="closeChatBtn" class="chat-toggle-button">X</button>
+        </div>
+        <div class="chat-iframe-container">
+            <iframe id="chatIframe" src="/chat.html" class="chat-iframe"></iframe>
+        </div>
+    </div>
+
+    <!-- Custom Confirmation/Alert Modal -->
+    <div id="customConfirmAlertModal" class="custom-modal-overlay">
+        <div class="custom-modal-content">
+            <p id="customConfirmAlertMessage"></p>
+            <div class="modal-buttons">
+                <button id="customConfirmAlertYes" class="confirm-yes hidden">Yes</button>
+                <button id="customConfirmAlertNo" class="confirm-no hidden">No</button>
+                <button id="customConfirmAlertOk" class="alert-ok hidden">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State variables
+        let sidebarVisible = true; // State for main launcher sidebar visibility
+        let chatOverlayOpen = false; // State for chat overlay visibility
+        let currentView = 'homepage'; // Tracks current active view: 'homepage', 'games', 'game'
+
+        // DOM element references (will be initialized in window.onload)
+        let mainSidebar, sidebarToggleBtn, mainContentWrapper;
+        let homepageView, currentTimeDisplay, pinnedGamesGrid, homepageMenuLink; // Homepage elements
+        let gameLibraryView, gameSearchInput, gameGrid, gamesMenuLink; // Game Library elements
+        let gameContentContainer, loadedGameIframe; // New container for loaded game, and the iframe itself
+
+        let settingsModal, openSettingsBtn, closeSettingsBtn, saveSettingsBtn, bgColorInput, textColorInput,
+            gridGapInput, gridGapValueDisplay, gameTitleFontSizeInput, gameTitleFontSizeValueDisplay,
+            cardBorderRadiusInput, cardBorderRadiusValueDisplay, cardBgColorInput, cardShadowInput,
+            bgFileInput, clearBgButton, restoreDefaultsBtn, visualEffectsInput,
+            hueRotateInput, hueRotateValueDisplay; // New hue slider elements
+        let chatOverlay, openChatBtn, closeChatBtn;
+
+        let customConfirmAlertModal, customConfirmAlertMessage, customConfirmAlertYes, customConfirmAlertNo, customConfirmAlertOk;
+
+        // Settings tab elements
+        let tabButtons, tabContents;
+
+        // New Proxy page elements
+        let proxyMenuLink, htmlMenuLink;
+
+        // Mobile Controls elements
+        let mobileControlsSwitch, mobileControlsOverlay;
+        let dPadButtons, jumpButton;
+        let keysPressed = {}; // Object to track which virtual keys are currently pressed
+        
+        // New background div reference
+        let backgroundImageWrapper;
+
+        // Placeholder for custom background URL (will be set from settings)
+        let customBackgroundUrl = '';
+        let pinnedGames = []; // Array to store names of pinned games
+
+        // List of available games
+        const gameNames = [
+            "1", "1v1space", "2048", "8ball", "9007199254740992", "BTD4", "Bitlife", "Bloxorz",
+            "Chess", "DogeMiner", "Henrystickman", "HexGL", "L2F2", "L2F3", "Minecraft", "OT",
+            "PE", "SandboxelsOLD", "Subway", "TIOachievementunlocked", "adrenalinechallenge",
+            "among-us", "avalanche", "backrooms", "basketball-stars", "battleforgondor",
+            "bigredbutton", "blackknight", "bloonstd", "bloonstd2", "bloxors", "boxhead2play",
+            "breakingthebank", "btts", "cannon-basketball-4", "canyondefense", "cattle3d",
+            "cell-machine", "championarcher", "chrome-dino", "circlo", "connect3", "cookie-clicker",
+            "craftmine", "creativekillchamber", "csgo-clicker", "ctr", "ctr-holiday", "ctr-tr",
+            "cubefield", "cupcake2048", "deal-or-no-deal", "death-run-3d", "defend-the-tank",
+            "doge2048", "doodle-jump", "doom", "doublewires", "draw-the-hill", "ducklife1",
+            "ducklife2", "ducklife3", "edgenotfound", "elasticman", "endlesswar3", "evil-glitch",
+            "exo", "factoryballs", "fake-virus", "flappy-2048", "flappy-bird", "flashtetris",
+            "game-inside", "geodash", "getaway-shootout", "gimme-the-airpod", "glass-city",
+            "google-snake", "grindcraft", "hackertype", "hba", "helicopter", "hexempire",
+            "hextris", "idle-breakout", "idle-shark", "impossiblequiz", "interactivebuddy",
+            "just-one-boss", "kittencannon", "krunker", "learntofly", "mario", "matrixrampage",
+            "meme2048", "minecraft-classic", "minesweeper", "miniputt", "missiles", "motox3m",
+            "motox3m-pool", "motox3m-spooky", "motox3m-winter", "n-gon", "ns-shaft", "om-bounce",
+            "pandemic2", "papaspizzaria", "paperio2", "papery-planes", "particle-clicker",
+            "polybranch", "portalflash", "push-the-square", "push-your-luck", "retro-bowl", "rh",
+            "rolly-vortex", "rooftop-snipers", "sand-game", "sandboxels","slope", "sm64", "sm64-main",
+            "smashkarts", "smokingbarrels", "snowbattle", "soldier-legend", "solitaire",
+            "sort-the-court", "soundboard", "stack", "stack-bump-3d", "stealingthediamond",
+            "stickwar", "stormthehouse2", "superhot", "swerve", "tacticalassasin2", "tank-trouble-2",
+            "tanuki-sunset", "temple-run-2", "the-final-earth", "thebattle", "theheist",
+            "there-is-no-game", "thisistheonlylevel", "tosstheturtle", "tube-jumpers",
+            "tunnel-rush", "tv-static", "vex3", "vex4", "vex5", "vex6", "webretro", "webretro-local", "wolf3d",
+            "wordle", "worlds-hardest-game", "you-are-bezos","EaglerX","EaglerForge"
+        ];
+
+        // Default settings for UI customization (used for "Restore Defaults")
+        const defaultSettings = {
+            backgroundColor: '#1a202c', /* Default dark background color if no image */
+            textColor: '#e2e8f0', /* Default light text */
+            gridGap: '1.5',
+            gameTitleFontSize: '0.9',
+            cardBorderRadius: '0.5',
+            cardBgColor: 'rgba(255, 255, 255, 0.08)', /* Default translucent card background */
+            cardShadow: 'enabled',
+            customBackgroundUrl: '', // Default to no custom background
+            visualEffect: 'none', // Default visual effect
+            hueRotate: '0', // Default hue rotation value
+        };
+
+        // --- Utility Functions ---
+
+        /**
+         * Formats a game name for display, converting hyphens to spaces and capitalizing words.
+         * Special cases for "webretro-local" and "wolf3d".
+         * @param {string} gameName - The raw game name.
+         * @returns {string} The formatted game name.
+         */
+        function formatGameNameForDisplay(gameName) {
+            if (gameName === "webretro-local") {
+                return "Webretro Local";
+            }
+            if (gameName === "wolf3d") {
+                return "Wolf3D";
+            }
+            return gameName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        /**
+         * Generates the path for a game icon.
+         * @param {string} gameName - The game name.
+         * @param {string} [extension='.png'] - The file extension for the icon.
+         * @returns {string} The full path to the game icon.
+         */
+        function getGameIconPath(gameName, extension = '.png') {
+            return `/projects/${gameName}/${gameName}${extension}`;
+        }
+
+        /**
+         * Creates a game card element for display in grids.
+         * @param {string} gameName - The name of the game.
+         * @param {boolean} showPinButton - Whether to include a pin button.
+         * @returns {HTMLElement} The created game card element.
+         */
+        function createGameCard(gameName, showPinButton = false) {
+            const gameCard = document.createElement('a');
+            gameCard.href = "#";
+            gameCard.classList.add('game-card');
+            gameCard.target = "_self";
+            gameCard.rel = "noopener noreferrer";
+            gameCard.dataset.gameName = gameName;
+            gameCard.dataset.gameUrl = `/projects/${gameName}/index.html`;
+
+            gameCard.addEventListener('click', (event) => {
+                event.preventDefault();
+                loadGameIntoMainContent(gameCard.dataset.gameUrl);
+            });
+
+            const img = document.createElement('img');
+            img.src = getGameIconPath(gameName, '.png');
+            img.alt = formatGameNameForDisplay(gameName);
+            img.onerror = function() {
+                // Fallback to .jpg first
+                if (!this.dataset.fallbackTriedJpg) {
+                    this.src = getGameIconPath(gameName, '.jpg');
+                    this.dataset.fallbackTriedJpg = 'true';
+                } else {
+                    // If .jpg also fails, use Unicode character
+                    const parent = this.parentNode;
+                    const fallbackDiv = document.createElement('div');
+                    fallbackDiv.classList.add('fallback-icon');
+                    fallbackDiv.textContent = '🎮'; // Unicode game controller icon
+                    parent.replaceChild(fallbackDiv, this); // Replace img with fallback div
+                    this.onerror = null; // Prevent infinite loop
+                }
+            };
+            gameCard.appendChild(img);
+
+            const titleDiv = document.createElement('div');
+            titleDiv.classList.add('game-card-title');
+
+            // Create a span for the text with a transparent background
+            const titleTextSpan = document.createElement('span');
+            titleTextSpan.classList.add('game-card-title-text-bg');
+            titleTextSpan.textContent = formatGameNameForDisplay(gameName);
+            titleDiv.appendChild(titleTextSpan);
+
+            gameCard.appendChild(titleDiv);
+
+            if (showPinButton) {
+                const pinButton = document.createElement('button');
+                pinButton.classList.add('pin-button');
+                pinButton.innerHTML = '&#9733;'; // Star icon
+                pinButton.title = 'Pin/Unpin Game';
+
+                // Set initial pinned state
+                if (pinnedGames.includes(gameName)) {
+                    pinButton.classList.add('pinned');
+                } else {
+                    pinButton.classList.add('unpinned');
+                }
+
+                pinButton.addEventListener('click', (event) => {
+                    event.stopPropagation(); // Prevent card click event
+                    event.preventDefault(); // Prevent default button behavior
+                    togglePinGame(gameName, pinButton);
+                });
+                gameCard.appendChild(pinButton);
+            }
+
+            return gameCard;
+        }
+
+        // --- Game Grid Population & Filtering ---
+
+        /** Populates the game grid with all available games. */
+        function populateGameGrid() {
+            gameGrid.innerHTML = ''; // Clear existing cards
+            gameNames.forEach(gameName => {
+                gameGrid.appendChild(createGameCard(gameName, true)); // Show pin button in library
+            });
+        }
+
+        /** Filters the displayed game cards based on the search input. */
+        function filterGames() {
+            const query = gameSearchInput.value.toLowerCase();
+            const gameCards = document.querySelectorAll('#gameGrid .game-card'); // Target only game library cards
+            gameCards.forEach(card => {
+                const gameName = card.dataset.gameName.toLowerCase();
+                if (gameName.includes(query)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        // --- Sidebar Control (Main Launcher) ---
+
+        /** Hides the main sidebar and adjusts main content margin. */
+        function hideSidebar() {
+            mainSidebar.classList.add('hidden');
+            mainContentWrapper.classList.add('sidebar-hidden');
+            sidebarVisible = false;
+            sidebarToggleBtn.classList.add('visible', 'sidebar-hidden-arrow');
+        }
+
+        /** Shows the main sidebar and adjusts main content margin. */
+        function showSidebar() {
+            mainSidebar.classList.remove('hidden');
+            mainContentWrapper.classList.remove('sidebar-hidden');
+            sidebarVisible = true;
+            sidebarToggleBtn.classList.remove('visible', 'sidebar-hidden-arrow');
+        }
+
+        /** Toggles the main sidebar visibility. */
+        function toggleMainSidebar() {
+            if (sidebarVisible) {
+                hideSidebar();
+            } else {
+                showSidebar();
+            }
+        }
+
+        // --- Settings Modal Control ---
+
+        /** Opens the settings modal and closes other overlays. */
+        function openSettingsModal() {
+            settingsModal.classList.add('open');
+            hideChatOverlay(); // Close chat if open
+            // Show the default tab when opening settings
+            showSettingsTab('appearance');
+        }
+
+        /** Closes the settings modal and clears the file input. */
+        function closeSettingsModal() {
+            settingsModal.classList.remove('open');
+            bgFileInput.value = ''; // Clear selected file for security/privacy
+        }
+
+        /**
+         * Saves the current settings to LocalStorage and applies them.
+         * Handles potential QuotaExceededError for large background images.
+         */
+        function saveSettings() {
+            const settings = {
+                backgroundColor: bgColorInput.value,
+                textColor: textColorInput.value,
+                gridGap: gridGapInput.value,
+                gameTitleFontSize: gameTitleFontSizeInput.value,
+                cardBorderRadius: cardBorderRadiusInput.value,
+                cardBgColor: cardBgColorInput.value,
+                cardShadow: cardShadowInput.value,
+                customBackgroundUrl: customBackgroundUrl, // Use the global customBackgroundUrl
+                visualEffect: visualEffectsInput.value, // Save visual effect
+                hueRotate: hueRotateInput.value, // Save hue rotation value
+            };
+            try {
+                localStorage.setItem('launcherSettings', JSON.stringify(settings));
+                console.log("Settings saved successfully to LocalStorage!");
+                closeSettingsModal();
+                loadAndApplySettings(); // Apply settings immediately after saving
+            } catch (e) {
+                console.error("Error saving settings to LocalStorage:", e);
+                if (e.name === 'QuotaExceededError') {
+                    showAlertDialog('Local storage is full. Please clear some space or try a smaller background image.');
+                } else {
+                    showAlertDialog('An error occurred while saving settings.');
+                }
+            }
+        }
+
+        /**
+         * Prompts the user for confirmation and restores settings to defaults if confirmed.
+         */
+        function restoreDefaultSettings() {
+            showConfirmDialog('Are you sure you want to restore all settings to defaults?', () => {
+                // If user confirms, reset custom background URL and save defaults
+                customBackgroundUrl = '';
+                bgFileInput.value = ''; // Clear file input
+                // Override all settings with defaults and save
+                localStorage.setItem('launcherSettings', JSON.stringify(defaultSettings));
+                saveSettings(); // This will save defaults and apply them
+            });
+        }
+
+        /**
+         * Loads settings from LocalStorage or uses defaults, then applies them to the UI.
+         */
+        function loadAndApplySettings() {
+            try {
+                const storedSettings = localStorage.getItem('launcherSettings');
+                const settings = storedSettings ? JSON.parse(storedSettings) : defaultSettings;
+
+                // Apply styles to body and root CSS variables
+                document.body.style.color = settings.textColor;
+                document.documentElement.style.setProperty('--grid-gap', `${settings.gridGap}rem`);
+                document.documentElement.style.setProperty('--game-title-font-size', `${settings.gameTitleFontSize}rem`);
+                document.documentElement.style.setProperty('--card-border-radius', `${settings.cardBorderRadius}rem`);
+                document.documentElement.style.setProperty('--translucent-lighter-bg', settings.cardBgColor);
+                document.documentElement.style.setProperty('--card-shadow-active', settings.cardShadow === 'disabled' ? 'none' : '0 4px 15px rgba(0, 0, 0, 0.15)');
+
+                // Set the hue rotation value for the CSS variable
+                document.documentElement.style.setProperty('--hue-rotate-value', `${settings.hueRotate}deg`);
+
+
+                // Apply background image and visual effects to the dedicated wrapper
+                const defaultBackgroundImageUrl = '/bg.png';
+                if (settings.customBackgroundUrl) {
+                    backgroundImageWrapper.style.backgroundImage = `url('${settings.customBackgroundUrl}')`;
+                    customBackgroundUrl = settings.customBackgroundUrl; // Update global variable
+                } else {
+                    backgroundImageWrapper.style.backgroundImage = `url(${defaultBackgroundImageUrl})`;
+                    customBackgroundUrl = ''; // Clear global variable
+                }
+
+                // Apply visual effects to the body class
+                document.body.classList.remove('effect-grayscale', 'effect-sepia', 'effect-invert', 'effect-heavy-blur');
+                if (settings.visualEffect && settings.visualEffect !== 'none') {
+                    document.body.classList.add(`effect-${settings.visualEffect}`);
+                }
+
+                // Update settings modal inputs if they exist (only when modal is open or just loaded)
+                if (bgColorInput) bgColorInput.value = settings.backgroundColor;
+                if (textColorInput) textColorInput.value = settings.textColor;
+                if (gridGapInput) gridGapInput.value = settings.gridGap;
+                if (gridGapValueDisplay) gridGapValueDisplay.textContent = `${settings.gridGap}rem`;
+                if (gameTitleFontSizeInput) gameTitleFontSizeInput.value = settings.gameTitleFontSize;
+                if (gameTitleFontSizeValueDisplay) gameTitleFontSizeValueDisplay.textContent = `${settings.gameTitleFontSize}rem`;
+                if (cardBorderRadiusInput) cardBorderRadiusInput.value = settings.cardBorderRadius;
+                if (cardBorderRadiusValueDisplay) cardBorderRadiusValueDisplay.textContent = `${settings.cardBorderRadius}rem`;
+                if (cardBgColorInput) cardBgColorInput.value = settings.cardBgColor;
+                if (cardShadowInput) cardShadowInput.value = settings.cardShadow;
+                if (visualEffectsInput) visualEffectsInput.value = settings.visualEffect; // Update visual effect dropdown
+                if (hueRotateInput) hueRotateInput.value = settings.hueRotate;
+                if (hueRotateValueDisplay) hueRotateValueDisplay.textContent = `${settings.hueRotate}°`;
+
+            } catch (error) {
+                console.error("Error loading settings from LocalStorage:", error);
+                // Fallback to hardcoded defaults if parsing fails or localStorage issues
+                document.body.style.color = defaultSettings.textColor;
+                backgroundImageWrapper.style.backgroundImage = `url('/bg.png')`;
+                document.body.classList.remove('effect-grayscale', 'effect-sepia', 'effect-invert', 'effect-heavy-blur'); // Clear effects
+                showAlertDialog('Could not load saved settings. Applying default settings.');
+            }
+        }
+
+        /**
+         * Handles the custom background image file input.
+         * Reads the file as a Data URL and stores it.
+         */
+        function handleBackgroundFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 15 * 1024 * 1024) { // 15MB limit
+                    showAlertDialog('File size exceeds 15MB limit. Please choose a smaller image.');
+                    bgFileInput.value = ''; // Clear the input
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    customBackgroundUrl = e.target.result; // Store the Data URL
+                };
+                reader.onerror = (e) => {
+                    console.error("FileReader error:", e);
+                    showAlertDialog('Failed to read file. Please try again.');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        /** Clears the custom background image and updates settings. */
+        function clearCustomBackground() {
+            customBackgroundUrl = '';
+            bgFileInput.value = ''; // Clear the file input visually
+            saveSettings(); // Save the updated settings (without custom background)
+        }
+
+        // --- Chat Overlay Control ---
+
+        /** Shows the chat overlay. */
+        function showChatOverlay() {
+            chatOverlay.classList.add('open');
+            chatOverlayOpen = true;
+            // When chat is open, it should overlay the main content, including loaded games
+            chatOverlay.classList.add('overlay-active');
+        }
+
+        /** Hides the chat overlay. */
+        function hideChatOverlay() {
+            chatOverlay.classList.remove('open');
+            chatOverlayOpen = false;
+            chatOverlay.classList.remove('overlay-active'); // Remove high z-index
+        }
+
+        /** Toggles the chat overlay visibility. */
+        function toggleChatOverlay() {
+            if (chatOverlayOpen) {
+                hideChatOverlay();
+            } else {
+                showChatOverlay();
+            }
+        }
+
+        /**
+         * Shows a specific settings tab and hides others.
+         * @param {string} tabId - The ID of the tab content to show (e.g., 'appearance', 'visual-effects', 'background').
+         */
+        function showSettingsTab(tabId) {
+            // Deactivate all tab buttons and hide all tab contents
+            tabButtons.forEach(button => button.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+
+            // Activate the selected tab button and show its content
+            const selectedButton = document.querySelector(`.tab-button[data-tab="${tabId}"]`);
+            const selectedContent = document.getElementById(`${tabId}SettingsTab`);
+
+            if (selectedButton) selectedButton.classList.add('active');
+            if (selectedContent) selectedContent.classList.add('active');
+        }
+
+        // --- View Switching Functions ---
+
+        /**
+         * Loads the specified game URL into the main content area.
+         * Hides other views and shows the game iframe.
+         * @param {string} gameUrl - The URL of the game to load.
+         */
+        function loadGameIntoMainContent(gameUrl) {
+            // Update current view state
+            currentView = 'game';
+
+            // Adjust main content wrapper for full screen game
+            mainContentWrapper.classList.add('game-loaded');
+
+            // Hide other views
+            homepageView.style.display = 'none';
+            gameLibraryView.style.display = 'none';
+
+            // Show game content container
+            gameContentContainer.style.display = 'flex';
+
+            // Clear any existing iframe and create a new one
+            gameContentContainer.innerHTML = '';
+            loadedGameIframe = document.createElement('iframe');
+            loadedGameIframe.id = 'loadedGameIframe';
+            loadedGameIframe.classList.add('w-full', 'h-full'); // Tailwind classes for full width/height
+            loadedGameIframe.setAttribute('allowfullscreen', 'true'); // Allow fullscreen
+            loadedGameIframe.src = gameUrl;
+            gameContentContainer.appendChild(loadedGameIframe);
+
+            // Ensure sidebar overlays the game content if it's open
+            mainSidebar.classList.add('overlay-active');
+            // Ensure chat overlays the game content if it's open
+            chatOverlay.classList.add('overlay-active');
+
+            // Close any open modals/overlays
+            closeSettingsModal();
+            hideChatOverlay();
+        }
+
+        /**
+         * Shows the game library view and hides other views.
+         */
+        function showGameLibrary() {
+            // Update current view state
+            currentView = 'games';
+
+            // Reset main content wrapper to default for game library
+            mainContentWrapper.classList.remove('game-loaded');
+
+            // Hide other views
+            homepageView.style.display = 'none';
+            gameContentContainer.style.display = 'none';
+            gameContentContainer.innerHTML = ''; // Clear iframe content
+            loadedGameIframe = null; // Clear iframe reference
+
+            // Show game library view
+            gameLibraryView.style.display = 'flex'; // Use flex to maintain column layout
+
+            // Remove overlay-active from sidebar and chat
+            mainSidebar.classList.remove('overlay-active');
+            chatOverlay.classList.remove('overlay-active');
+
+            // Close any open modals/overlays
+            closeSettingsModal();
+            hideChatOverlay();
+        }
+
+        /**
+         * Shows the homepage view and hides other views.
+         */
+        function showHomepage() {
+            // Update current view state
+            currentView = 'homepage';
+
+            // Reset main content wrapper to default for homepage
+            mainContentWrapper.classList.remove('game-loaded');
+
+            // Hide other views
+            gameLibraryView.style.display = 'none';
+            gameContentContainer.style.display = 'none';
+            gameContentContainer.innerHTML = ''; // Clear iframe content
+            loadedGameIframe = null; // Clear iframe reference
+
+            // Show homepage view
+            homepageView.style.display = 'flex'; // Use flex to maintain column layout
+
+            // Remove overlay-active from sidebar and chat
+            mainSidebar.classList.remove('overlay-active');
+            chatOverlay.classList.remove('overlay-active');
+
+            // Close any open modals/overlays
+            closeSettingsModal();
+            hideChatOverlay();
+
+            // Refresh pinned games on homepage
+            renderPinnedGames();
+        }
+
+        // --- Pinned Games Logic ---
+
+        /** Loads pinned games from LocalStorage. */
+        function loadPinnedGames() {
+            try {
+                const storedPinnedGames = localStorage.getItem('pinnedGames');
+                if (storedPinnedGames) {
+                    pinnedGames = JSON.parse(storedPinnedGames);
+                }
+            } catch (e) {
+                console.error("Error loading pinned games from LocalStorage:", e);
+                pinnedGames = []; // Reset if corrupted
+            }
+        }
+
+        /** Saves pinned games to LocalStorage. */
+        function savePinnedGames() {
+            try {
+                localStorage.setItem('pinnedGames', JSON.stringify(pinnedGames));
+            } catch (e) {
+                console.error("Error saving pinned games to LocalStorage:", e);
+                showAlertDialog('Could not save pinned games. Local storage might be full.');
+            }
+        }
+
+        /**
+         * Toggles the pinned status of a game.
+         * @param {string} gameName - The name of the game to pin/unpin.
+         * @param {HTMLElement} pinButton - The pin button element to update its class.
+         */
+        function togglePinGame(gameName, pinButton) {
+            const index = pinnedGames.indexOf(gameName);
+            if (index > -1) {
+                // Game is already pinned, unpin it
+                pinnedGames.splice(index, 1);
+                pinButton.classList.remove('pinned');
+                pinButton.classList.add('unpinned');
+                showAlertDialog(`${formatGameNameForDisplay(gameName)} unpinned from homepage.`);
+            } else {
+                // Game is not pinned, pin it
+                pinnedGames.push(gameName);
+                pinButton.classList.add('pinned');
+                pinButton.classList.remove('unpinned');
+                showAlertDialog(`${formatGameNameForDisplay(gameName)} pinned to homepage!`);
+            }
+            savePinnedGames();
+            // If currently on homepage, re-render to reflect changes
+            if (currentView === 'homepage') {
+                renderPinnedGames();
+            }
+        }
+
+        /** Renders the pinned games on the homepage. */
+        function renderPinnedGames() {
+            pinnedGamesGrid.innerHTML = '';
+            if (pinnedGames.length === 0) {
+                const noPinnedMessage = document.createElement('p');
+                noPinnedMessage.textContent = "No games pinned yet. Go to 'Games Menu' to pin your favorites!";
+                noPinnedMessage.classList.add('text-center', 'col-span-full', 'text-gray-400', 'mt-4');
+                pinnedGamesGrid.appendChild(noPinnedMessage);
+            } else {
+                pinnedGames.forEach(gameName => {
+                    // Ensure the pinned game actually exists in the full gameNames list
+                    if (gameNames.includes(gameName)) {
+                        pinnedGamesGrid.appendChild(createGameCard(gameName, true)); // Show pin button on homepage cards too
+                    } else {
+                        // If a pinned game no longer exists, remove it from pinned list
+                        const index = pinnedGames.indexOf(gameName);
+                        if (index > -1) {
+                            pinnedGames.splice(index, 1);
+                            savePinnedGames();
+                        }
+                    }
+                });
+            }
+        }
+
+        // --- Time Display Logic ---
+        function updateTime() {
+            const now = new Date();
+            const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+            currentTimeDisplay.textContent = now.toLocaleTimeString('en-US', options);
+        }
+
+
+        // --- Custom Confirmation/Alert Modals ---
+
+        /**
+         * Displays a custom confirmation dialog.
+         * @param {string} message - The message to display.
+         * @param {Function} onConfirm - Callback function if 'Yes' is clicked.
+         * @param {Function} [onCancel] - Optional callback function if 'No' is clicked.
+         */
+        function showConfirmDialog(message, onConfirm, onCancel = () => {}) {
+            customConfirmAlertMessage.textContent = message;
+            customConfirmAlertYes.classList.remove('hidden');
+            customConfirmAlertNo.classList.remove('hidden');
+            customConfirmAlertOk.classList.add('hidden'); // Hide OK button
+
+            // Clear previous listeners to prevent multiple calls
+            customConfirmAlertYes.onclick = null;
+            customConfirmAlertNo.onclick = null;
+
+            customConfirmAlertYes.onclick = () => {
+                customConfirmAlertModal.classList.remove('open');
+                onConfirm();
+            };
+            customConfirmAlertNo.onclick = () => {
+                customConfirmAlertModal.classList.remove('open');
+                onCancel();
+            };
+
+            customConfirmAlertModal.classList.add('open');
+        }
+
+        /**
+         * Displays a custom alert dialog.
+         * @param {string} message - The message to display.
+         * @param {Function} [onOk] - Optional callback function if 'OK' is clicked.
+         */
+        function showAlertDialog(message, onOk = () => {}) {
+            customConfirmAlertMessage.textContent = message;
+            customConfirmAlertYes.classList.add('hidden'); // Hide Yes button
+            customConfirmAlertNo.classList.add('hidden'); // Hide No button
+            customConfirmAlertOk.classList.remove('hidden');
+
+            customConfirmAlertOk.onclick = null; // Clear previous listener
+            customConfirmAlertOk.onclick = () => {
+                customConfirmAlertModal.classList.remove('open');
+                onOk();
+            };
+
+            customConfirmAlertModal.classList.add('open');
+        }
+
+        // --- Mobile Controls Logic ---
+        /**
+         * Simulates a keydown event for a given key.
+         * @param {string} key - The key to simulate (e.g., 'w', 'a', 's', ' ').
+         */
+        function simulateKeyDown(key) {
+            // Prevent multiple keydown events for the same key
+            if (!keysPressed[key]) {
+                const event = new KeyboardEvent('keydown', {
+                    key: key,
+                    code: `Key${key.toUpperCase()}`,
+                    bubbles: true,
+                    cancelable: true,
+                });
+
+                if (loadedGameIframe && loadedGameIframe.contentWindow) {
+                    loadedGameIframe.contentWindow.dispatchEvent(event);
+                } else {
+                    document.dispatchEvent(event);
+                }
+                keysPressed[key] = true;
+            }
+        }
+
+        /**
+         * Simulates a keyup event for a given key.
+         * @param {string} key - The key to simulate (e.g., 'w', 'a', 's', ' ').
+         */
+        function simulateKeyUp(key) {
+            if (keysPressed[key]) {
+                const event = new KeyboardEvent('keyup', {
+                    key: key,
+                    code: `Key${key.toUpperCase()}`,
+                    bubbles: true,
+                    cancelable: true,
+                });
+
+                if (loadedGameIframe && loadedGameIframe.contentWindow) {
+                    loadedGameIframe.contentWindow.dispatchEvent(event);
+                } else {
+                    document.dispatchEvent(event);
+                }
+                keysPressed[key] = false;
+            }
+        }
+
+        /**
+         * Attaches event listeners to mobile control buttons.
+         * Uses 'mousedown' and 'mouseup' for mouse, 'touchstart' and 'touchend' for touch.
+         * @param {HTMLElement} button - The button element.
+         * @param {string} key - The key associated with the button.
+         */
+        function setupMobileControlButton(button, key) {
+            // Mouse events
+            button.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                button.classList.add('active');
+                simulateKeyDown(key);
+            });
+            button.addEventListener('mouseup', (e) => {
+                e.preventDefault();
+                button.classList.remove('active');
+                simulateKeyUp(key);
+            });
+            button.addEventListener('mouseleave', () => {
+                 if (button.classList.contains('active')) {
+                     button.classList.remove('active');
+                     simulateKeyUp(key);
+                 }
+            });
+
+            // Touch events
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                button.classList.add('active');
+                simulateKeyDown(key);
+            });
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                button.classList.remove('active');
+                simulateKeyUp(key);
+            });
+            button.addEventListener('touchcancel', () => {
+                if (button.classList.contains('active')) {
+                     button.classList.remove('active');
+                     simulateKeyUp(key);
+                 }
+            });
+        }
+
+
+        // --- Initialization on Window Load ---
+        window.onload = function () {
+            // Initialize DOM element references
+            mainSidebar = document.getElementById('mainSidebar');
+            sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+            mainContentWrapper = document.getElementById('mainContentWrapper');
+            backgroundImageWrapper = document.getElementById('backgroundImageWrapper');
+
+            homepageView = document.getElementById('homepageView');
+            currentTimeDisplay = document.getElementById('currentTime');
+            pinnedGamesGrid = document.getElementById('pinnedGamesGrid');
+            homepageMenuLink = document.getElementById('homepageMenuLink');
+
+            gameLibraryView = document.getElementById('gameLibraryView');
+            gameSearchInput = document.getElementById('gameSearchInput');
+            gameGrid = document.getElementById('gameGrid');
+            gamesMenuLink = document.getElementById('gamesMenuLink'); // Correctly initialized here
+            gameContentContainer = document.getElementById('gameContentContainer');
+
+            settingsModal = document.getElementById('settingsModal');
+            openSettingsBtn = document.getElementById('openSettingsBtn');
+            closeSettingsBtn = document.getElementById('closeSettingsBtn');
+            saveSettingsBtn = document.getElementById('saveSettingsBtn');
+            restoreDefaultsBtn = document.getElementById('restoreDefaultsBtn');
+            bgColorInput = document.getElementById('bgColorInput');
+            textColorInput = document.getElementById('textColorInput');
+            gridGapInput = document.getElementById('gridGapInput');
+            gridGapValueDisplay = document.getElementById('gridGapValue');
+            gameTitleFontSizeInput = document.getElementById('gameTitleFontSizeInput');
+            gameTitleFontSizeValueDisplay = document.getElementById('gameTitleFontSizeValue');
+            cardBorderRadiusInput = document.getElementById('cardBorderRadiusInput');
+            cardBorderRadiusValueDisplay = document.getElementById('cardBorderRadiusValue');
+            cardBgColorInput = document.getElementById('cardBgColorInput');
+            cardShadowInput = document.getElementById('cardShadowInput');
+            bgFileInput = document.getElementById('bgFileInput');
+            clearBgButton = document.getElementById('clearBgButton');
+            visualEffectsInput = document.getElementById('visualEffectsInput');
+            hueRotateInput = document.getElementById('hueRotateInput');
+            hueRotateValueDisplay = document.getElementById('hueRotateValue');
+
+            chatOverlay = document.getElementById('chatOverlay');
+            openChatBtn = document.getElementById('openChatBtn');
+            closeChatBtn = document.getElementById('closeChatBtn');
+
+            customConfirmAlertModal = document.getElementById('customConfirmAlertModal');
+            customConfirmAlertMessage = document.getElementById('customConfirmAlertMessage');
+            customConfirmAlertYes = document.getElementById('customConfirmAlertYes');
+            customConfirmAlertNo = document.getElementById('customConfirmAlertNo');
+            customConfirmAlertOk = document.getElementById('customConfirmAlertOk');
+
+            // Initialize settings tab elements
+            tabButtons = document.querySelectorAll('.tab-button');
+            tabContents = document.querySelectorAll('.tab-content');
+
+            // New Proxy menu link element
+            proxyMenuLink = document.getElementById('proxyMenuLink');
+            htmlMenuLink = document.getElementById('htmlMenuLink');
+
+            // Mobile controls elements
+            mobileControlsSwitch = document.getElementById('mobileControlsSwitch');
+            mobileControlsOverlay = document.getElementById('mobileControlsOverlay');
+            dPadButtons = document.querySelectorAll('.d-pad-button[data-key]');
+            jumpButton = document.querySelector('.jump-button');
+
+            // Load and apply settings immediately on page load
+            loadAndApplySettings();
+            // Load pinned games from local storage
+            loadPinnedGames();
+            // Populate the game grid (for games menu)
+            populateGameGrid();
+            // Start time display
+            updateTime();
+            setInterval(updateTime, 1000); // Update time every second
+
+            // Ensure homepage is visible on load
+            showHomepage();
+
+            // --- Event Listeners ---
+
+            // Sidebar toggle button (main launcher)
+            sidebarToggleBtn.addEventListener('click', toggleMainSidebar);
+
+            // Settings button
+            openSettingsBtn.addEventListener('click', openSettingsModal);
+            closeSettingsBtn.addEventListener('click', closeSettingsModal);
+            saveSettingsBtn.addEventListener('click', saveSettings);
+            restoreDefaultsBtn.addEventListener('click', restoreDefaultSettings);
+
+            // Settings input change listeners to update display values
+            gridGapInput.addEventListener('input', () => {
+                gridGapValueDisplay.textContent = `${gridGapInput.value}rem`;
+            });
+            gameTitleFontSizeInput.addEventListener('input', () => {
+                gameTitleFontSizeValueDisplay.textContent = `${gameTitleFontSizeInput.value}rem`;
+            });
+            cardBorderRadiusInput.addEventListener('input', () => {
+                cardBorderRadiusValueDisplay.textContent = `${cardBorderRadiusInput.value}rem`;
+            });
+            hueRotateInput.addEventListener('input', () => {
+                hueRotateValueDisplay.textContent = `${hueRotateInput.value}°`;
+                document.documentElement.style.setProperty('--hue-rotate-value', `${hueRotateInput.value}deg`);
+            });
+
+            // Background file input and clear button
+            bgFileInput.addEventListener('change', handleBackgroundFileUpload);
+            clearBgButton.addEventListener('click', clearCustomBackground);
+
+            // Chat button
+            openChatBtn.addEventListener('click', () => {
+                showChatOverlay();
+                closeSettingsModal(); // Ensure settings modal is closed
+            });
+            closeChatBtn.addEventListener('click', hideChatOverlay);
+
+            // Game search input
+            gameSearchInput.addEventListener('input', filterGames);
+
+            // Navigation links
+            if (homepageMenuLink) {
+                homepageMenuLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showHomepage();
+                });
+            } else {
+                console.error("Error: homepageMenuLink element not found!");
+            }
+
+            if (gamesMenuLink) {
+                gamesMenuLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showGameLibrary(); // Correctly call showGameLibrary
+                });
+            } else {
+                console.error("Error: gamesMenuLink element not found!");
+            }
+
+            // Proxy menu link listener to directly load the page
+            if (proxyMenuLink) {
+                proxyMenuLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadGameIntoMainContent('prxychoose.html');
+                });
+            } else {
+                console.error("Error: proxyMenuLink element not found!");
+            }
+
+            // HTML menu link listener to directly load the page
+            if (htmlMenuLink) {
+                htmlMenuLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadGameIntoMainContent('html.html');
+                });
+            } else {
+                console.error("Error: htmlMenuLink element not found!");
+            }
+
+
+            // Settings tab navigation listeners
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    showSettingsTab(button.dataset.tab);
+                });
+            });
+
+            // Mobile Controls Switch listener
+            mobileControlsSwitch.addEventListener('change', () => {
+                if (mobileControlsSwitch.checked) {
+                    mobileControlsOverlay.classList.add('visible');
+                } else {
+                    mobileControlsOverlay.classList.remove('visible');
+                }
+            });
+
+            // Set up event listeners for all mobile control buttons
+            dPadButtons.forEach(button => {
+                setupMobileControlButton(button, button.dataset.key);
+            });
+            setupMobileControlButton(jumpButton, jumpButton.dataset.key);
+        };
+
+        // Arrow Key Listener for Sidebar Visibility (global, for main launcher)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                // This logic needs to be updated to handle overlaying when in-game
+                if (currentView === 'game') {
+                    // Toggle sidebar overlay state
+                    if (mainSidebar.classList.contains('overlay-active')) {
+                        mainSidebar.classList.remove('overlay-active');
+                        // If sidebar was overlaying, and it's now not, ensure it's not hidden if it was meant to be visible
+                        if (sidebarVisible) { // If sidebar was meant to be visible, but was overlaying, remove hidden class
+                             mainSidebar.classList.remove('hidden');
+                             mainContentWrapper.classList.remove('sidebar-hidden');
+                        }
+                    } else {
+                        mainSidebar.classList.add('overlay-active');
+                        // When overlaying, ensure it's visible
+                        mainSidebar.classList.remove('hidden');
+                        mainContentWrapper.classList.remove('sidebar-hidden');
+                    }
+                } else {
+                    // Existing logic for non-game views
+                    if (sidebarVisible) {
+                        hideSidebar();
+                    } else {
+                        showSidebar();
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

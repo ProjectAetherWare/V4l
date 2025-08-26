@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V4l OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <style>
+        /* Base styles for Windows 10-like look */
+        body {
+            font-family: 'Segoe UI', sans-serif; /* Windows 10 font */
+            background-image: url('bg.png'); /* Default background image */
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center center;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            color: #333; /* Default text color */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            transition: background-color 0.3s ease;
+        }
+
+        /* Dark mode styles */
+        body[data-theme="dark"] {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            background-blend-mode: overlay;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Windows 10 Taskbar */
+        .taskbar {
+            background-color: rgba(0, 0, 0, 0.7); /* Darker, less transparent */
+            height: 48px; /* Standard Windows taskbar height */
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            padding: 0 5px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3); /* Shadow only on top */
+            z-index: 1000;
+            transition: background-color 0.3s ease;
+        }
+
+        body[data-theme="dark"] .taskbar {
+            background-color: rgba(20, 20, 20, 0.8);
+        }
+
+        /* Start Button */
+        .start-button {
+            background-color: transparent;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            padding: 0 10px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .start-button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .start-button:active {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Taskbar items (icons for open apps and pinned apps) */
+        .taskbar-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px; /* Square icons */
+            height: 40px;
+            margin: 0 2px;
+            border-radius: 2px; /* Slightly rounded corners */
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-bottom 0.2s ease;
+            position: relative;
+        }
+
+        .taskbar-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .taskbar-item.active {
+            border-bottom: 3px solid #0078d4; /* Windows 10 accent blue */
+        }
+
+        .taskbar-item img {
+            width: 28px; /* Slightly smaller icons */
+            height: 28px;
+            object-fit: contain;
+        }
+
+        /* Taskbar context menu */
+        .context-menu {
+            position: absolute;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            padding: 5px 0;
+            border-radius: 2px;
+            z-index: 2000; /* Above everything else */
+            display: none;
+        }
+
+        body[data-theme="dark"] .context-menu {
+            background-color: #333;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        .context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .context-menu-item:hover {
+            background-color: #e0e0e0;
+        }
+
+        body[data-theme="dark"] .context-menu-item:hover {
+            background-color: #555;
+        }
+
+        /* System Tray (formerly Status bar) */
+        .system-tray {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            height: 48px;
+            background-color: rgba(0, 0, 0, 0.7); /* Same as taskbar */
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            color: #fff;
+            font-size: 13px;
+            z-index: 1000;
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body[data-theme="dark"] .system-tray {
+            background-color: rgba(20, 20, 20, 0.8);
+            border-color: rgba(255, 255, 255, 0.05);
+            color: #e0e0e0;
+        }
+
+        .system-tray-item {
+            padding: 0 8px;
+            cursor: pointer;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+
+        .system-tray-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Modern button style (Windows 10 flat/minimal) */
+        .modern-button {
+            background-color: #e6e6e6; /* Light gray */
+            color: #333;
+            border: 1px solid #ccc;
+            border-radius: 2px; /* Less rounded */
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: none; /* No shadow by default */
+            transition: background-color 0.1s ease, border-color 0.1s ease, color 0.3s ease;
+        }
+        body[data-theme="dark"] .modern-button {
+            background-color: #3f3f3f;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        .modern-button:hover {
+            background-color: #e0e0e0;
+            border-color: #bbb;
+            box-shadow: none;
+        }
+        body[data-theme="dark"] .modern-button:hover {
+            background-color: #555;
+            border-color: #777;
+        }
+
+        .modern-button:active {
+            background-color: #d0d0d0;
+            border-color: #aaa;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        body[data-theme="dark"] .modern-button:active {
+            background-color: #2a2a2a;
+            border-color: #444;
+        }
+
+        /* Accent button */
+        .accent-button {
+            background-color: #0078d4; /* Windows 10 Accent Blue */
+            color: #fff;
+            border-color: #0078d4;
+        }
+
+        .accent-button:hover {
+            background-color: #0063b1;
+            border-color: #0063b1;
+        }
+
+        .accent-button:active {
+            background-color: #00569a;
+            border-color: #00569a;
+        }
+
+        /* Modern input style */
+        .modern-input {
+            background-color: #FFFFFF;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            padding: 7px 10px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            box-shadow: none;
+            transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, background-color 0.3s ease, color 0.3s ease;
+        }
+        body[data-theme="dark"] .modern-input {
+            background-color: #222;
+            border-color: #444;
+            color: #e0e0e0;
+        }
+
+        .modern-input:focus {
+            border-color: #0078d4; /* Windows 10 blue focus */
+            box-shadow: 0 0 0 1px #0078d4; /* Thin blue outline */
+        }
+
+        /* Modern window container styles */
+        .os-window {
+            background-color: #f2f2f2; /* Less translucent */
+            border-radius: 0; /* Sharp corners */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); /* Softer shadow */
+            position: absolute;
+            resize: both;
+            overflow: hidden;
+            min-width: 300px;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #ccc; /* Visible border */
+            transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+        body[data-theme="dark"] .os-window {
+            background-color: #2d2d2d;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            border-color: #444;
+        }
+
+        /* Title bar styling */
+        .title-bar {
+            background-color: #e6e6e6; /* Light gray */
+            color: #333;
+            font-weight: 400; /* Regular font weight */
+            padding: 0; /* No padding */
+            height: 30px; /* Standard height */
+            display: flex;
+            justify-content: space-between; /* Space out title and buttons */
+            align-items: center;
+            cursor: grab;
+            flex-shrink: 0;
+            border-bottom: 1px solid #ccc; /* Clearer separator */
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+        body[data-theme="dark"] .title-bar {
+            background-color: #333;
+            color: #e0e0e0;
+            border-color: #555;
+        }
+
+        .title-bar.dragging {
+            cursor: grabbing;
+        }
+
+        .title-text {
+            flex-grow: 1;
+            text-align: left; /* Title on the left */
+            padding-left: 10px;
+            font-size: 13px;
+        }
+
+        .title-bar-buttons {
+            display: flex;
+            height: 100%;
+        }
+
+        /* Windows 10-style window control buttons */
+        .title-bar-button {
+            width: 45px; /* Wider buttons */
+            height: 100%;
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.1s ease, color 0.1s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px; /* Larger icons */
+            color: #555;
+            outline: none;
+            border-radius: 0; /* No rounded corners */
+        }
+        body[data-theme="dark"] .title-bar-button {
+            color: #ccc;
+        }
+
+        .title-bar-button:hover {
+            background-color: #d0d0d0; /* Light gray hover */
+        }
+        body[data-theme="dark"] .title-bar-button:hover {
+            background-color: #444;
+        }
+
+        .title-bar-button.close-button:hover {
+            background-color: #e81123; /* Red hover for close button */
+            color: #fff;
+        }
+
+        /* Window content area */
+        .window-content {
+            padding: 15px;
+            flex-grow: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            transition: color 0.3s ease;
+            background-color: #fff; /* Solid white background for content */
+        }
+        body[data-theme="dark"] .window-content {
+            background-color: #1e1e1e;
+        }
+
+        /* Hidden class for toggling window visibility */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Overrides and adjustments for original content within the OS theme */
+        h1, p {
+            color: #333;
+            transition: color 0.3s ease;
+        }
+        body[data-theme="dark"] h1, body[data-theme="dark"] p {
+            color: #e0e0e0;
+        }
+
+        h1 {
+            font-size: 26px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        p {
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        #search-bar {
+            @apply modern-input;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px; /* Slightly smaller gap */
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .info-link {
+            @apply modern-button;
+            padding: 8px 15px;
+            font-size: 14px;
+            flex-grow: 1;
+            max-width: 200px;
+        }
+
+        /* Container for game cards within the games window */
+        .game-card-container {
+            display: grid; /* Use grid for better layout control */
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Responsive grid */
+            gap: 10px;
+            justify-items: center;
+            padding: 5px;
+        }
+
+        /* Styling for individual game cards (Launchpad buttons) */
+        .game-card {
+            background-color: #fff; /* Solid white background */
+            border-radius: 2px;
+            text-decoration: none;
+            text-align: center;
+            padding: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+            transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, background-color 0.1s ease-out;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            overflow: hidden;
+            position: relative;
+            width: 120px; /* Adjusted size */
+            height: 140px; /* Adjusted height */
+            flex-shrink: 0;
+            border: 1px solid #eee;
+        }
+        body[data-theme="dark"] .game-card {
+            background-color: #2d2d2d;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            border-color: #444;
+        }
+
+        .game-card:hover {
+            transform: translateY(-2px); /* Subtle lift */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+            background-color: #f5f5f5;
+        }
+        body[data-theme="dark"] .game-card:hover {
+            background-color: #3f3f3f;
+        }
+
+        .game-card img {
+            width: 70px; /* Adjusted icon size */
+            height: 70px;
+            object-fit: cover;
+            border-radius: 0; /* No rounded corners */
+            margin-bottom: 5px;
+            box-shadow: none;
+        }
+
+        /* Game title - always visible below the picture */
+        .game-card .game-title {
+            color: #333;
+            font-size: 12px;
+            font-weight: 400;
+            word-break: break-word;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+            width: 100%;
+            transition: color 0.3s ease;
+            opacity: 1;
+            visibility: visible;
+        }
+        body[data-theme="dark"] .game-card .game-title {
+            color: #e0e0e0;
+        }
+
+        /* Ensure window elements are not selectable during drag */
+        .title-bar, .title-bar * {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .os-window {
+                width: 95% !important;
+                height: 80% !important;
+                left: 2.5% !important;
+                top: 5% !important;
+                transform: none !important;
+            }
+
+            .taskbar {
+                height: 40px;
+            }
+
+            .start-button {
+                font-size: 18px;
+            }
+
+            .taskbar-item {
+                width: 35px;
+                height: 35px;
+            }
+
+            .taskbar-item img {
+                width: 24px;
+                height: 24px;
+            }
+
+            .system-tray {
+                height: 40px;
+                padding: 0 5px;
+                font-size: 11px;
+            }
+
+            .game-card-container {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            }
+
+            .game-card {
+                width: 100px;
+                height: 120px;
+            }
+
+            .game-card img {
+                width: 60px;
+                height: 60px;
+            }
+
+            .game-card .game-title {
+                font-size: 10px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+            p {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="taskbar" id="mainTaskbar">
+        <button class="start-button" id="startButton">
+            <i class="fab fa-windows"></i> </button>
+        <div id="taskbarApps" class="flex-grow flex items-center">
+            <div id="launchpadButton" class="taskbar-item" data-window-id="gamesWindow">
+                <img src="osico/launchpad.png" onerror="handleSystemIconError(this, 'dice-d6')" alt="Launchpad">
+            </div>
+            <div id="settingsButton" class="taskbar-item" data-window-id="settingsWindow">
+                <img src="osico/settings.png" onerror="handleSystemIconError(this, 'cog')" alt="Settings">
+            </div>
+            <div id="finderDockItem" class="taskbar-item">
+                <img src="osico/finder.png" onerror="handleSystemIconError(this, 'folder')" alt="File Explorer">
+            </div>
+            <div id="v4lTextButton" class="taskbar-item" data-app-url="text.html" data-app-title="V4Ltext" data-app-img="osico/v4ltext.png">
+                <img src="osico/v4ltext.png" onerror="handleSystemIconError(this, 'file-alt')" alt="V4Ltext Icon">
+            </div>
+            <div id="v4lPaintButton" class="taskbar-item" data-app-url="paint.html" data-app-title="V4LPaint" data-app-img="osico/v4lpaintd.png">
+                <img src="osico/v4lpaintd.png" onerror="handleSystemIconError(this, 'paint-brush')" alt="V4LPaint Icon">
+            </div>
+        </div>
+
+        <div class="system-tray">
+            <span id="currentTime" class="system-tray-item"></span>
+            <span id="currentDate" class="system-tray-item"></span>
+            <i class="fas fa-wifi system-tray-item"></i>
+            <i class="fas fa-volume-up system-tray-item"></i>
+            <i class="fas fa-battery-half system-tray-item"></i>
+        </div>
+    </div>
+
+    <div class="flex-grow flex items-center justify-center p-4" style="padding-bottom: 48px;">
+        <div class="os-window" id="welcomeWindow" style="width: 450px; height: 300px; left: 50%; top: 50%; transform: translate(-50%, -50%);">
+            <div class="title-bar">
+                <span class="title-text">Welcome to V4l!</span>
+                <div class="title-bar-buttons">
+                    <button class="title-bar-button" onclick="minimizeWindow('welcomeWindow')"><i class="fas fa-minus"></i></button>
+                    <button class="title-bar-button" onclick="maximizeWindow('welcomeWindow')"><i class="far fa-square"></i></button>
+                    <button class="title-bar-button close-button" onclick="closeWindow('welcomeWindow')"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="window-content text-center flex flex-col justify-between items-center h-full">
+                <h1>Welcome to V4l!</h1>
+                <p>Hello! This is a modern take on a classic game portal.</p>
+                <div class="button-container">
+                    <a href="https://forms.gle/vZiTZZ97Qngp52bW8" class="info-link accent-button" target="_blank">Submit a game</a>
+                    <a href="https://forms.gle/D76Teo8VL2Kw46kg6" class="info-link" target="_blank">Feedback</a>
+                </div>
+                <p class="text-sm text-gray-600 mt-auto">Most of the games were ported to html by 3hk0</p>
+            </div>
+        </div>
+
+        <div class="os-window hidden" id="settingsWindow" style="width: 500px; height: 350px; left: 50%; top: 50%; transform: translate(-50%, -50%);">
+            <div class="title-bar">
+                <span class="title-text">Settings</span>
+                <div class="title-bar-buttons">
+                    <button class="title-bar-button" onclick="minimizeWindow('settingsWindow')"><i class="fas fa-minus"></i></button>
+                    <button class="title-bar-button" onclick="maximizeWindow('settingsWindow')"><i class="far fa-square"></i></button>
+                    <button class="title-bar-button close-button" onclick="closeWindow('settingsWindow')"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="window-content flex flex-col gap-4">
+                <h2 class="text-xl font-semibold">Appearance</h2>
+                <div class="flex items-center justify-between p-2 rounded-sm bg-gray-100 dark:bg-gray-800 transition-colors border border-gray-200 dark:border-gray-700">
+                    <span>Dark Mode:</span>
+                    <button id="darkModeToggle" class="modern-button">Toggle</button>
+                </div>
+
+                <h2 class="text-xl font-semibold mt-4">Background</h2>
+                <div class="flex items-center justify-between p-2 rounded-sm bg-gray-100 dark:bg-gray-800 transition-colors border border-gray-200 dark:border-gray-700">
+                    <span>Upload Custom Background:</span>
+                    <input type="file" id="bgUploadInput" accept="image/*" class="modern-input">
+                </div>
+                <div class="flex items-center justify-between p-2 rounded-sm bg-gray-100 dark:bg-gray-800 transition-colors border border-gray-200 dark:border-gray-700">
+                    <span>Reset to Default Background:</span>
+                    <button id="resetBgButton" class="modern-button">Reset</button>
+                </div>
+                
+                <h2 class="text-xl font-semibold mt-4">Other Settings</h2>
+                <p class="text-gray-700 dark:text-gray-400">More settings options will be added here in the future.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="os-window hidden" id="gamesWindow" style="width: 75%; height: 85%; left: 12.5%; top: 5%;">
+        <div class="title-bar">
+            <span class="title-text">Games</span>
+            <div class="title-bar-buttons">
+                <button class="title-bar-button" onclick="minimizeWindow('gamesWindow')"><i class="fas fa-minus"></i></button>
+                <button class="title-bar-button" onclick="maximizeWindow('gamesWindow')"><i class="far fa-square"></i></button>
+                <button class="title-bar-button close-button" onclick="closeWindow('gamesWindow')"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div class="window-content">
+            <input type="text" id="search-bar" class="modern-input" onkeyup="filterGames()" placeholder="Search games..." list="recentGamesList">
+            <datalist id="recentGamesList"></datalist>
+
+            <div class="game-card-container" id="gameCardsContainer">
+                <a href="/projects/1v1space/index.html" class="game-card" data-game-title="1v1space">
+                    <img src="/projects/1v1space/1v1space.jpg" onerror="handleGameImageError(this)" alt="1v1space Thumbnail">
+                    <div class="game-title">1v1space</div>
+                </a>
+                <a href="/projects/2048/index.html" class="game-card" data-game-title="2048">
+                    <img src="/projects/2048/2048.jpg" onerror="handleGameImageError(this)" alt="2048 Thumbnail">
+                    <div class="game-title">2048</div>
+                </a>
+                <a href="/projects/8ball/index.html" class="game-card" data-game-title="8ball">
+                    <img src="/projects/8ball/8ball.jpg" onerror="handleGameImageError(this)" alt="8ball Thumbnail">
+                    <div class="game-title">8ball</div>
+                </a>
+                <a href="/projects/9007199254740992/index.html" class="game-card" data-game-title="9007199254740992">
+                    <img src="/projects/9007199254740992/9007199254740992.jpg" onerror="handleGameImageError(this)" alt="9007199254740992 Thumbnail">
+                    <div class="game-title">9007199254740992</div>
+                </a>
+                <a href="/projects/BTD4/index.html" class="game-card" data-game-title="BTD4">
+                    <img src="/projects/BTD4/BTD4.jpg" onerror="handleGameImageError(this)" alt="BTD4 Thumbnail">
+                    <div class="game-title">BTD4</div>
+                </a>
+                <a href="/projects/Bitlife/index.html" class="game-card" data-game-title="Bitlife">
+                    <img src="/projects/Bitlife/Bitlife.jpg" onerror="handleGameImageError(this)" alt="Bitlife Thumbnail">
+                    <div class="game-title">Bitlife</div>
+                </a>
+                <a href="/projects/Bloxorz/index.html" class="game-card" data-game-title="Bloxorz">
+                    <img src="/projects/Bloxorz/Bloxorz.jpg" onerror="handleGameImageError(this)" alt="Bloxorz Thumbnail">
+                    <div class="game-title">Bloxorz</div>
+                </a>
+                <a href="/projects/Chess/index.html" class="game-card" data-game-title="Chess">
+                    <img src="/projects/Chess/Chess.jpg" onerror="handleGameImageError(this)" alt="Chess Thumbnail">
+                    <div class="game-title">Chess</div>
+                </a>
+                <a href="/projects/DogeMiner/index.html" class="game-card" data-game-title="DogeMiner">
+                    <img src="/projects/DogeMiner/DogeMiner.jpg" onerror="handleGameImageError(this)" alt="DogeMiner Thumbnail">
+                    <div class="game-title">DogeMiner</div>
+                </a>
+                <a href="/projects/Henrystickman/index.html" class="game-card" data-game-title="Henrystickman">
+                    <img src="/projects/Henrystickman/Henrystickman.jpg" onerror="handleGameImageError(this)" alt="Henrystickman Thumbnail">
+                    <div class="game-title">Henrystickman</div>
+                </a>
+                <a href="/projects/HexGL/index.html" class="game-card" data-game-title="HexGL">
+                    <img src="/projects/HexGL/HexGL.jpg" onerror="handleGameImageError(this)" alt="HexGL Thumbnail">
+                    <div class="game-title">HexGL</div>
+                </a>
+                <a href="/projects/L2F2/index.html" class="game-card" data-game-title="L2F2">
+                    <img src="/projects/L2F2/L2F2.jpg" onerror="handleGameImageError(this)" alt="L2F2 Thumbnail">
+                    <div class="game-title">L2F2</div>
+                </a>
+                <a href="/projects/L2F3/index.html" class="game-card" data-game-title="L2F3">
+                    <img src="/projects/L2F3/L2F3.jpg" onerror="handleGameImageError(this)" alt="L2F3 Thumbnail">
+                    <div class="game-title">L2F3</div>
+                </a>
+                <a href="/projects/Minecraft/index.html" class="game-card" data-game-title="Minecraft">
+                    <img src="/projects/Minecraft/Minecraft.jpg" onerror="handleGameImageError(this)" alt="Minecraft Thumbnail">
+                    <div class="game-title">Minecraft</div>
+                </a>
+                <a href="/projects/OT/index.html" class="game-card" data-game-title="OT">
+                    <img src="/projects/OT/OT.jpg" onerror="handleGameImageError(this)" alt="OT Thumbnail">
+                    <div class="game-title">OT</div>
+                </a>
+                <a href="/projects/PE/index.html" class="game-card" data-game-title="PE">
+                    <img src="/projects/PE/PE.jpg" onerror="handleGameImageError(this)" alt="PE Thumbnail">
+                    <div class="game-title">PE</div>
+                </a>
+                <a href="/projects/SandboxelsOLD/index.html" class="game-card" data-game-title="SandboxelsOLD">
+                    <img src="/projects/SandboxelsOLD/SandboxelsOLD.jpg" onerror="handleGameImageError(this)" alt="SandboxelsOLD Thumbnail">
+                    <div class="game-title">SandboxelsOLD</div>
+                </a>
+                <a href="/projects/Subway/index.html" class="game-card" data-game-title="Subway">
+                    <img src="/projects/Subway/Subway.jpg" onerror="handleGameImageError(this)" alt="Subway Thumbnail">
+                    <div class="game-title">Subway</div>
+                </a>
+                <a href="/projects/TIO/index.html" class="game-card" data-game-title="TIO">
+                    <img src="/projects/TIO/TIO.jpg" onerror="handleGameImageError(this)" alt="TIO Thumbnail">
+                    <div class="game-title">TIO</div>
+                </a>
+                <a href="/projects/achievementunlocked/index.html" class="game-card" data-game-title="achievementunlocked">
+                    <img src="/projects/achievementunlocked/achievementunlocked.jpg" onerror="handleGameImageError(this)" alt="achievementunlocked Thumbnail">
+                    <div class="game-title">achievementunlocked</div>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div id="desktopContextMenu" class="context-menu">
+        <div class="context-menu-item" onclick="openWindow('settingsWindow'); hideContextMenu('desktopContextMenu');">Display Settings</div>
+        <div class="context-menu-item" onclick="openWindow('welcomeWindow'); hideContextMenu('desktopContextMenu');">Personalize</div>
+        <div class="context-menu-item" onclick="toggleDarkMode(); hideContextMenu('desktopContextMenu');">Toggle Dark Mode</div>
+        <div class="context-menu-item" onclick="openNewWindow('about:blank', 'New Window'); hideContextMenu('desktopContextMenu');">New Window</div>
+    </div>
+
+    <script>
+        // Store references to open windows
+        const openWindows = {};
+        const minimizedWindows = {};
+
+        // Track last z-index to manage window stacking
+        let lastZIndex = 100;
+
+        // Function to handle image errors for system icons (dock)
+        function handleSystemIconError(img, iconClass) {
+            img.style.display = 'none'; // Hide the broken image
+            const iconElement = document.createElement('i');
+            iconElement.classList.add('fas', `fa-${iconClass}`); // Add Font Awesome class
+            img.parentNode.insertBefore(iconElement, img.nextSibling); // Insert after img
+        }
+
+        // Function to handle image errors for game thumbnails
+        function handleGameImageError(img) {
+            img.src = 'https://via.placeholder.com/90x90?text=No+Image'; // Placeholder image
+            img.onerror = null; // Prevent infinite loop if placeholder also fails
+        }
+
+        // Window Management Functions
+        function createDraggableWindow(windowElement) {
+            const titleBar = windowElement.querySelector('.title-bar');
+            let isDragging = false;
+            let currentX;
+            let currentY;
+            let initialX;
+            let initialY;
+            let xOffset = 0;
+            let yOffset = 0;
+
+            if (titleBar) {
+                titleBar.addEventListener('mousedown', dragStart);
+                titleBar.addEventListener('mouseup', dragEnd);
+                titleBar.addEventListener('mousemove', drag);
+                titleBar.addEventListener('touchstart', dragStart);
+                titleBar.addEventListener('touchend', dragEnd);
+                titleBar.addEventListener('touchmove', drag);
+            }
+
+            function dragStart(e) {
+                if (e.target.closest('.title-bar-button')) {
+                    return; // Don't drag if clicking buttons
+                }
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+
+                if (e.type === "touchstart") {
+                    initialX = e.touches[0].clientX - xOffset;
+                    initialY = e.touches[0].clientY - yOffset;
+                }
+
+                isDragging = true;
+                titleBar.classList.add('dragging');
+                bringWindowToFront(windowElement.id);
+            }
+
+            function dragEnd(e) {
+                isDragging = false;
+                titleBar.classList.remove('dragging');
+            }
+
+            function drag(e) {
+                if (!isDragging) return;
+
+                e.preventDefault();
+
+                if (e.type === "touchmove") {
+                    currentX = e.touches[0].clientX - initialX;
+                    currentY = e.touches[0].clientY - initialY;
+                } else {
+                    currentX = e.clientX - initialX;
+                    currentY = e.clientY - initialY;
+                }
+
+                xOffset = currentX;
+                yOffset = currentY;
+
+                setTranslate(currentX, currentY, windowElement);
+            }
+
+            function setTranslate(xPos, yPos, el) {
+                el.style.transform = "translate3d(" + xPos + "px, " + yPos + "px, 0)";
+            }
+        }
+
+        function openWindow(windowId) {
+            const windowElement = document.getElementById(windowId);
+            if (windowElement) {
+                windowElement.classList.remove('hidden');
+                bringWindowToFront(windowId);
+                // Remove from minimized state if it was minimized
+                if (minimizedWindows[windowId]) {
+                    windowElement.style.display = ''; // Restore default display
+                    delete minimizedWindows[windowId];
+                }
+                openWindows[windowId] = true; // Mark as open
+                updateTaskbar();
+            }
+        }
+
+        function closeWindow(windowId) {
+            const windowElement = document.getElementById(windowId);
+            if (windowElement) {
+                windowElement.classList.add('hidden');
+                delete openWindows[windowId]; // Mark as closed
+                delete minimizedWindows[windowId]; // Ensure it's not minimized
+                updateTaskbar();
+            }
+        }
+
+        function minimizeWindow(windowId) {
+            const windowElement = document.getElementById(windowId);
+            if (windowElement) {
+                windowElement.style.display = 'none'; // Hide it
+                minimizedWindows[windowId] = true; // Mark as minimized
+                updateTaskbar();
+            }
+        }
+
+        function maximizeWindow(windowId) {
+            const windowElement = document.getElementById(windowId);
+            if (windowElement) {
+                if (windowElement.dataset.isMaximized === 'true') {
+                    // Restore original size and position
+                    windowElement.style.width = windowElement.dataset.originalWidth;
+                    windowElement.style.height = windowElement.dataset.originalHeight;
+                    windowElement.style.top = windowElement.dataset.originalTop;
+                    windowElement.style.left = windowElement.dataset.originalLeft;
+                    windowElement.style.transform = windowElement.dataset.originalTransform;
+                    windowElement.dataset.isMaximized = 'false';
+                } else {
+                    // Save original size and position
+                    windowElement.dataset.originalWidth = windowElement.style.width;
+                    windowElement.dataset.originalHeight = windowElement.style.height;
+                    windowElement.dataset.originalTop = windowElement.style.top;
+                    windowElement.dataset.originalLeft = windowElement.style.left;
+                    windowElement.dataset.originalTransform = windowElement.style.transform;
+
+                    // Maximize
+                    windowElement.style.width = '100vw';
+                    windowElement.style.height = 'calc(100vh - 48px)'; // Account for taskbar
+                    windowElement.style.top = '0';
+                    windowElement.style.left = '0';
+                    windowElement.style.transform = 'none'; // Remove any translate
+                    windowElement.dataset.isMaximized = 'true';
+                }
+                bringWindowToFront(windowId);
+            }
+        }
+
+        function bringWindowToFront(windowId) {
+            const windowElement = document.getElementById(windowId);
+            if (windowElement) {
+                lastZIndex++;
+                windowElement.style.zIndex = lastZIndex;
+                // Deactivate all other open windows in taskbar
+                document.querySelectorAll('.taskbar-item').forEach(item => {
+                    if (item.dataset.windowId && item.dataset.windowId !== windowId) {
+                        item.classList.remove('active');
+                    }
+                });
+                // Activate the current window's taskbar item
+                const taskbarItem = document.querySelector(`.taskbar-item[data-window-id="${windowId}"]`);
+                if (taskbarItem) {
+                    taskbarItem.classList.add('active');
+                }
+            }
+        }
+
+        // Taskbar Management
+        function updateTaskbar() {
+            const taskbarAppsContainer = document.getElementById('taskbarApps');
+            taskbarAppsContainer.innerHTML = ''; // Clear existing items
+
+            // Add pinned apps first
+            const pinnedApps = [
+                { id: 'launchpadButton', icon: 'osico/launchpad.png', alt: 'Launchpad', windowId: 'gamesWindow' },
+                { id: 'settingsButton', icon: 'osico/settings.png', alt: 'Settings', windowId: 'settingsWindow' },
+                { id: 'finderDockItem', icon: 'osico/finder.png', alt: 'File Explorer', windowId: 'finderWindow' }, // Assuming a finder/file explorer window
+                { id: 'v4lTextButton', icon: 'osico/v4ltext.png', alt: 'V4Ltext', appUrl: 'text.html', appTitle: 'V4Ltext' },
+                { id: 'v4lPaintButton', icon: 'osico/v4lpaintd.png', alt: 'V4LPaint', appUrl: 'paint.html', appTitle: 'V4LPaint' },
+            ];
+
+            pinnedApps.forEach(app => {
+                const item = document.createElement('div');
+                item.id = app.id;
+                item.classList.add('taskbar-item');
+                if (app.windowId) {
+                    item.dataset.windowId = app.windowId;
+                    item.onclick = () => {
+                        const windowElement = document.getElementById(app.windowId);
+                        if (windowElement) {
+                            if (windowElement.classList.contains('hidden') || windowElement.style.display === 'none') {
+                                openWindow(app.windowId);
+                            } else if (minimizedWindows[app.windowId]) {
+                                openWindow(app.windowId); // Restore from minimized
+                            } else {
+                                minimizeWindow(app.windowId); // Minimize if already open and active
+                            }
+                        }
+                    };
+                } else if (app.appUrl) {
+                    // For direct app launches (like V4Ltext, V4LPaint)
+                    item.onclick = () => openApp(app.appUrl, app.appTitle, app.icon);
+                }
+
+                const img = document.createElement('img');
+                img.src = app.icon;
+                img.alt = app.alt;
+                img.onerror = () => handleSystemIconError(img, app.alt.toLowerCase().replace(/\s/g, '-')); // Fallback icon
+
+                item.appendChild(img);
+                taskbarAppsContainer.appendChild(item);
+
+                // Add active class if the window is open and not minimized
+                if (app.windowId && openWindows[app.windowId] && !minimizedWindows[app.windowId]) {
+                    item.classList.add('active');
+                }
+            });
+
+            // Re-apply draggable to all windows
+            document.querySelectorAll('.os-window').forEach(win => createDraggableWindow(win));
+        }
+
+
+        // Clock and Date
+        function updateTime() {
+            const now = new Date();
+            const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+            const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', timeOptions);
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', dateOptions);
+        }
+        setInterval(updateTime, 1000);
+        updateTime(); // Initial call
+
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        darkModeToggle.addEventListener('click', toggleDarkMode);
+
+        function toggleDarkMode() {
+            const body = document.body;
+            if (body.dataset.theme === 'dark') {
+                body.dataset.theme = 'light';
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.dataset.theme = 'dark';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // Apply saved theme on load
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.dataset.theme = 'dark';
+        }
+
+        // Custom Background
+        const bgUploadInput = document.getElementById('bgUploadInput');
+        const resetBgButton = document.getElementById('resetBgButton');
+
+        bgUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.body.style.backgroundImage = `url('${e.target.result}')`;
+                    localStorage.setItem('customBackground', e.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        resetBgButton.addEventListener('click', () => {
+            document.body.style.backgroundImage = "url('bg.png')"; // Reset to default
+            localStorage.removeItem('customBackground');
+        });
+
+        // Load custom background on start
+        const savedBackground = localStorage.getItem('customBackground');
+        if (savedBackground) {
+            document.body.style.backgroundImage = `url('${savedBackground}')`;
+        }
+
+        // Game Filtering (Launchpad/Games Window)
+        function filterGames() {
+            const searchBar = document.getElementById('search-bar');
+            const filter = searchBar.value.toLowerCase();
+            const gameCards = document.getElementById('gameCardsContainer').getElementsByClassName('game-card');
+            const recentGamesList = document.getElementById('recentGamesList');
+            recentGamesList.innerHTML = ''; // Clear previous suggestions
+
+            for (let i = 0; i < gameCards.length; i++) {
+                const title = gameCards[i].dataset.gameTitle;
+                if (title.toLowerCase().includes(filter)) {
+                    gameCards[i].style.display = ""; // Show
+                    const option = document.createElement('option');
+                    option.value = title;
+                    recentGamesList.appendChild(option);
+                } else {
+                    gameCards[i].style.display = "none"; // Hide
+                }
+            }
+        }
+
+        // Initialize draggable windows
+        document.querySelectorAll('.os-window').forEach(createDraggableWindow);
+
+        // Open Games window when Launchpad button is clicked
+        document.getElementById('launchpadButton').addEventListener('click', () => openWindow('gamesWindow'));
+
+        // Open Settings window when Settings button is clicked
+        document.getElementById('settingsButton').addEventListener('click', () => openWindow('settingsWindow'));
+
+        // Open V4Ltext/V4LPaint in a new window
+        document.querySelectorAll('.taskbar-item[data-app-url]').forEach(item => {
+            item.addEventListener('click', () => {
+                const appUrl = item.dataset.appUrl;
+                const appTitle = item.dataset.appTitle;
+                const appImg = item.querySelector('img') ? item.querySelector('img').src : '';
+                openApp(appUrl, appTitle, appImg);
+            });
+        });
+
+        function openApp(url, title, iconUrl) {
+            const newWindowId = `appWindow-${Date.now()}`;
+            const newWindow = document.createElement('div');
+            newWindow.id = newWindowId;
+            newWindow.classList.add('os-window');
+            newWindow.style.cssText = 'width: 800px; height: 600px; left: 10%; top: 10%;'; // Default size and position
+
+            newWindow.innerHTML = `
+                <div class="title-bar">
+                    <span class="title-text">${title}</span>
+                    <div class="title-bar-buttons">
+                        <button class="title-bar-button" onclick="minimizeWindow('${newWindowId}')"><i class="fas fa-minus"></i></button>
+                        <button class="title-bar-button" onclick="maximizeWindow('${newWindowId}')"><i class="far fa-square"></i></button>
+                        <button class="title-bar-button close-button" onclick="closeWindow('${newWindowId}')"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                <div class="window-content">
+                    <iframe src="${url}" style="width:100%; height:100%; border:none;"></iframe>
+                </div>
+            `;
+            document.body.appendChild(newWindow);
+            createDraggableWindow(newWindow);
+            openWindow(newWindowId);
+
+            // Add to taskbar
+            const taskbarAppsContainer = document.getElementById('taskbarApps');
+            const taskbarItem = document.createElement('div');
+            taskbarItem.id = `taskbarItem-${newWindowId}`;
+            taskbarItem.classList.add('taskbar-item');
+            taskbarItem.dataset.windowId = newWindowId;
+            taskbarItem.onclick = () => {
+                const targetWindow = document.getElementById(newWindowId);
+                if (targetWindow) {
+                    if (targetWindow.classList.contains('hidden') || targetWindow.style.display === 'none') {
+                        openWindow(newWindowId);
+                    } else if (minimizedWindows[newWindowId]) {
+                        openWindow(newWindowId);
+                    } else {
+                        minimizeWindow(newWindowId);
+                    }
+                }
+            };
+
+            const img = document.createElement('img');
+            img.src = iconUrl;
+            img.alt = `${title} Icon`;
+            img.onerror = () => handleSystemIconError(img, 'file'); // Generic fallback
+
+            taskbarItem.appendChild(img);
+            taskbarAppsContainer.appendChild(taskbarItem);
+            bringWindowToFront(newWindowId); // Bring new app window to front and activate taskbar item
+        }
+
+
+        // Context Menu Functionality
+        const desktop = document.body;
+        const desktopContextMenu = document.getElementById('desktopContextMenu');
+
+        desktop.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); // Prevent default browser context menu
+            // Check if right-clicked on desktop, not inside a window or taskbar
+            if (e.target === desktop || e.target.classList.contains('flex-grow')) {
+                desktopContextMenu.style.display = 'block';
+                desktopContextMenu.style.left = `${e.clientX}px`;
+                desktopContextMenu.style.top = `${e.clientY}px`;
+            } else {
+                hideContextMenu('desktopContextMenu');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            // Hide context menu if clicked anywhere else
+            if (!desktopContextMenu.contains(e.target)) {
+                hideContextMenu('desktopContextMenu');
+            }
+        });
+
+        function hideContextMenu(menuId) {
+            document.getElementById(menuId).style.display = 'none';
+        }
+
+        // Initial taskbar update to render pinned apps
+        updateTaskbar();
+
+    </script>
+</body>
+</html>

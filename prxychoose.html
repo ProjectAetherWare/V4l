@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrxyLauncher</title>
+    <!-- Use Tailwind CSS for a modern, responsive foundation -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            /* Set the background image and ensure it covers the entire page */
+            background-image: url('bg.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            font-family: 'Montserrat', sans-serif;
+            transition: all 0.3s ease-in-out;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .liquid-glass-container {
+            background-color: rgba(255, 255, 255, 0.15); /* Semi-transparent white */
+            backdrop-filter: blur(15px); /* The key blur effect */
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            border-radius: 2rem;
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .liquid-glass-button {
+            /* Styling for the buttons themselves */
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.2));
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            border: none;
+            color: #1a202c;
+            padding: 1rem 2rem;
+            border-radius: 9999px; /* Fully rounded pill shape */
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .liquid-glass-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .liquid-glass-button:active {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-size: 2.25rem; /* text-4xl */
+            font-weight: 700; /* font-bold */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-800">
+
+    <div class="liquid-glass-container">
+        <h1 class="text-3xl font-bold">Launch Menu</h1>
+        
+        <!-- Button for V4l Proxy -->
+        <a href="/prxy.html" class="liquid-glass-button">
+            <!-- A simple SVG icon for a modern feel -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            V4l Proxy
+        </a>
+        
+        <!-- Button for Ultraviolet -->
+        <a href="ultraviolet.html" class="liquid-glass-button">
+            <!-- Another SVG icon to match -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            Ultraviolet
+        </a>
+
+    </div>
+</body>
+</html>

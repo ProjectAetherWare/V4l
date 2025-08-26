@@ -1,0 +1,2301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Glass Chat (Host Controls)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Define CSS variables for customizable colors */
+        :root {
+            --color-accent-rgb: 255, 165, 0; /* Default Orange (RGB) */
+            --color-error-rgb: 255, 99, 71;   /* Tomato Red for errors */
+
+            /* Base UI colors (mostly static, but could be variables too) */
+            --color-app-bg-rgb: 47, 49, 54;
+            --color-sidebar-bg-rgb: 32, 34, 37;
+            --color-text-white-rgb: 255, 255, 255;
+            --color-text-lightgray-rgb: 185, 187, 190;
+            --color-shadow-black-rgb: 0, 0, 0;
+            --color-danger-rgb: 220, 38, 38; /* Red for kick/delete actions */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #36393f; /* Dark background for contrast with glass */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Ensure body takes full viewport height */
+            margin: 0;
+            padding: 0; /* Remove body padding to allow app-container to fill */
+            box-sizing: border-box;
+            overflow: hidden; /* Prevent body scroll if app overflows */
+        }
+        #app-container {
+            display: flex;
+            width: 100%;
+            max-width: 960px;
+            height: 90vh; /* Take up 90% of viewport height */
+            background-color: rgba(var(--color-app-bg-rgb), 0.4); /* Dark translucent base */
+            backdrop-filter: blur(30px) saturate(180%); /* Stronger blur for glass effect */
+            -webkit-backdrop-filter: blur(30px) saturate(180%); /* Safari support */
+            border-radius: 1.5rem; /* Large, soft rounded corners */
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.1); /* Subtle white border */
+            box-shadow: 0 8px 30px rgba(var(--color-shadow-black-rgb), 0.4); /* Deeper shadow */
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Left Sidebar for channels */
+        #sidebar {
+            width: 240px;
+            background-color: rgba(var(--color-sidebar-bg-rgb), 0.5); /* Darker translucent sidebar */
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            display: flex;
+            flex-direction: column;
+            padding: 0.5rem 0;
+            border-right: 1px solid rgba(var(--color-text-white-rgb), 0.08); /* Lighter, more subtle border */
+        }
+        #sidebar-header {
+            padding: 0.75rem 1rem;
+            font-weight: 700;
+            color: rgba(var(--color-text-white-rgb), 1);
+            border-bottom: 1px solid rgba(var(--color-text-white-rgb), 0.08);
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #add-room-button { /* Apply to settings button too */
+            background-color: rgba(var(--color-text-white-rgb), 0.1); /* Translucent light background */
+            color: rgba(var(--color-text-lightgray-rgb), 1); /* Light gray plus icon */
+            padding: 0.25rem 0.6rem;
+            border-radius: 0.5rem; /* More rounded */
+            font-weight: 700;
+            font-size: 1.25rem;
+            cursor: pointer;
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.1); /* Subtle border */
+            box-shadow: inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.1); /* Inner highlight */
+            transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        #add-room-button:hover {
+            background-color: rgba(var(--color-text-white-rgb), 0.2);
+            border-color: rgba(var(--color-text-white-rgb), 0.2);
+            box-shadow: inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.2);
+        }
+        .chatroom-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 0 0.5rem;
+        }
+        .chatroom-button {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            margin-bottom: 0.25rem;
+            background-color: transparent;
+            color: rgba(var(--color-text-white-rgb), 0.7); /* Slightly transparent white for text */
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease;
+            font-weight: 500;
+            text-align: left;
+            /* Glass-like button appearance */
+            border: 1px solid transparent;
+            box-shadow: 0 1px 3px rgba(var(--color-shadow-black-rgb), 0.1);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .chatroom-button:hover {
+            background-color: rgba(var(--color-text-white-rgb), 0.1); /* Subtle translucent highlight */
+            color: rgba(var(--color-text-white-rgb), 1); /* Full white on hover */
+            border-color: rgba(var(--color-text-white-rgb), 0.2);
+        }
+        .chatroom-button.active {
+            /* Accent color active state with glass effect */
+            background: linear-gradient(to bottom, rgba(var(--color-accent-rgb), 0.8), rgba(var(--color-accent-rgb), 0.6)); /* Accent gradient */
+            color: rgba(var(--color-text-white-rgb), 1);
+            font-weight: 600;
+            border-color: rgba(var(--color-text-white-rgb), 0.2); /* Light border */
+            box-shadow: 0 2px 8px rgba(var(--color-accent-rgb), 0.3), inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.3); /* Accent shadow */
+        }
+        .chatroom-button::before {
+            content: '/ '; /* Replaced # with / */
+            font-weight: 600;
+            margin-right: 0.2rem;
+            color: rgba(var(--color-text-white-rgb), 0.5); /* Lighter slash color */
+        }
+        .chatroom-button.active::before {
+            color: rgba(var(--color-text-white-rgb), 1); /* White slash for active */
+        }
+
+        /* Sidebar Footer for Settings */
+        #sidebar-footer {
+            margin-top: auto; /* Pushes to the bottom */
+            padding: 0.5rem 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #settings-button { /* Moved here */
+            font-size: 1.5rem; /* Larger icon for settings */
+            padding: 0.4rem 0.8rem;
+            color: rgba(var(--color-text-lightgray-rgb), 1);
+        }
+
+        /* Main Chat Area */
+        #main-chat-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #chat-header {
+            padding: 0.75rem 1.25rem;
+            font-weight: 600;
+            color: rgba(var(--color-text-white-rgb), 1);
+            background-color: rgba(var(--color-app-bg-rgb), 0.4); /* Matches app-container transparency */
+            backdrop-filter: blur(15px) saturate(180%);
+            -webkit-backdrop-filter: blur(15px) saturate(180%);
+            border-bottom: 1px solid rgba(var(--color-text-white-rgb), 0.08); /* Lighter subtle border */
+            display: flex; /* Make it a flex container */
+            justify-content: space-between; /* Space out items */
+            align-items: center;
+        }
+        #current-room-name {
+            flex-grow: 1; /* Allow room name to take space */
+        }
+        #host-actions {
+            position: relative; /* For dropdown positioning */
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .host-action-button {
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.2);
+            box-shadow: inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.2);
+        }
+        .host-action-button.delete {
+            background: linear-gradient(to bottom, rgba(var(--color-danger-rgb), 0.8), rgba(var(--color-danger-rgb), 0.6));
+            color: rgba(var(--color-text-white-rgb), 1);
+        }
+        .host-action-button.delete:hover {
+            background: linear-gradient(to bottom, rgba(var(--color-danger-rgb), 0.9), rgba(var(--color-danger-rgb), 0.7));
+            transform: translateY(-1px);
+        }
+        .host-action-button.delete:active {
+            transform: translateY(0);
+        }
+
+        #user-info-display {
+            font-size: 0.8rem;
+            color: rgba(var(--color-text-white-rgb), 0.6); /* Translucent white */
+            text-align: right;
+            padding-top: 0.25rem;
+            word-break: break-all;
+            /* Moved into chat-header, no longer need padding-top relative to it */
+        }
+
+        #messages-display {
+            flex-grow: 1;
+            padding: 1rem 1.25rem;
+            overflow-y: auto;
+            background-color: rgba(var(--color-shadow-black-rgb), 0.05); /* Very slight tint on top of app-container blur */
+            scroll-behavior: smooth;
+        }
+        .message-bubble {
+            background-color: transparent;
+            padding: 0.4rem 0; /* Increased vertical padding */
+            margin-bottom: 0.75rem;
+            max-width: 100%;
+            word-wrap: break-word;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .message-bubble.sent {
+            align-items: flex-end;
+        }
+        .message-content-wrapper {
+            background-color: rgba(var(--color-text-white-rgb), 0.1); /* Translucent light gray */
+            border-radius: 0.75rem; /* More rounded */
+            padding: 0.6rem 0.9rem;
+            color: rgba(var(--color-text-white-rgb), 1); /* White text */
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.1); /* Subtle border */
+            box-shadow: 0 2px 5px rgba(var(--color-shadow-black-rgb), 0.1); /* Softer shadow */
+        }
+        .message-bubble.sent .message-content-wrapper {
+            background-color: rgba(var(--color-accent-rgb), 0.7); /* Accent with transparency */
+            color: rgba(var(--color-text-white-rgb), 1);
+            border: 1px solid rgba(var(--color-accent-rgb), 0.8); /* Stronger accent border for sent */
+            box-shadow: 0 2px 5px rgba(var(--color-shadow-black-rgb), 0.15);
+        }
+        .message-info {
+            font-size: 0.7rem;
+            color: rgba(var(--color-text-white-rgb), 0.5); /* Translucent gray */
+            margin-top: 0.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem; /* Space between name/time and kick button */
+        }
+        .message-bubble.sent .message-info {
+            text-align: right;
+        }
+        .message-bubble:not(.sent) .message-info {
+            text-align: left;
+        }
+        .kick-ban-options {
+            position: absolute;
+            background-color: rgba(36, 39, 43, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            box-shadow: 0 4px 10px rgba(var(--color-shadow-black-rgb), 0.3);
+            z-index: 100; /* Above other elements */
+            right: 0; /* Align with right edge of parent */
+            top: 100%; /* Position below parent */
+            margin-top: 0.5rem; /* Small gap */
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            min-width: 120px;
+        }
+        .kick-ban-options button {
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.4rem;
+            background-color: transparent;
+            color: rgba(var(--color-text-white-rgb), 0.9);
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+        .kick-ban-options button:hover {
+            background-color: rgba(var(--color-text-white-rgb), 0.1);
+        }
+        .kick-button, .ban-button { /* General styling for kick/ban from message info */
+            background-color: rgba(var(--color-danger-rgb), 0.6);
+            color: rgba(var(--color-text-white-rgb), 0.9);
+            border: 1px solid rgba(var(--color-danger-rgb), 0.8);
+            border-radius: 0.3rem;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 1px 3px rgba(var(--color-shadow-black-rgb), 0.1);
+            backdrop-filter: blur(3px);
+        }
+        .kick-button:hover, .ban-button:hover {
+            background-color: rgba(var(--color-danger-rgb), 0.8);
+            transform: translateY(-1px);
+        }
+        .kick-button:active, .ban-button:active {
+            transform: translateY(0);
+        }
+
+
+        .chat-image {
+            max-width: 100%; /* Ensure images don't overflow */
+            max-height: 300px; /* Limit image height */
+            border-radius: 0.5rem; /* Rounded corners for images */
+            margin-top: 0.5rem;
+            display: block; /* Ensures images are on their own line */
+        }
+
+
+        #message-input-area {
+            background-color: rgba(var(--color-app-bg-rgb), 0.4); /* Matches app-container transparency */
+            backdrop-filter: blur(15px) saturate(180%);
+            -webkit-backdrop-filter: blur(15px) saturate(180%);
+            padding: 1rem 1.25rem;
+            display: flex;
+            gap: 0.75rem;
+            border-top: 1px solid rgba(var(--color-text-white-rgb), 0.08);
+            align-items: center; /* Align items vertically in the middle */
+        }
+        #message-input {
+            flex-grow: 1;
+            padding: 0.75rem 1rem;
+            background-color: rgba(var(--color-text-white-rgb), 0.1); /* Translucent light background */
+            color: rgba(var(--color-text-white-rgb), 1);
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.15); /* Subtle light border */
+            border-radius: 0.75rem; /* More rounded */
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        #message-input::placeholder {
+            color: rgba(var(--color-text-white-rgb), 0.5);
+        }
+        #message-input:focus {
+            border-color: rgba(var(--color-accent-rgb), 0.7); /* Accent focus */
+            box-shadow: 0 0 0 2px rgba(var(--color-accent-rgb), 0.4); /* Softer focus ring */
+            background-color: rgba(var(--color-text-white-rgb), 0.15);
+        }
+
+        /* Styling for the file input and upload button */
+        #image-upload-button {
+            width: 44px; /* Fixed width for a square button */
+            height: 44px; /* Fixed height for a square button */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(var(--color-text-white-rgb), 0.1); /* Translucent light background */
+            color: rgba(var(--color-text-lightgray-rgb), 1);
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.15);
+            border-radius: 0.75rem; /* Match input styling */
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            font-size: 1.5rem; /* Plus icon size */
+            line-height: 1; /* Center text */
+            box-shadow: inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.1);
+        }
+        #image-upload-button:hover {
+            background-color: rgba(var(--color-text-white-rgb), 0.2);
+            border-color: rgba(var(--color-text-white-rgb), 0.25);
+        }
+        #image-upload-button:active {
+            transform: translateY(1px);
+        }
+        #image-file-input {
+            display: none; /* Hide the actual file input */
+        }
+        #send-button {
+            width: 44px; /* Fixed width for a circle/square button */
+            height: 44px; /* Fixed height for a circle/square button */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(to bottom, rgba(var(--color-accent-rgb), 0.8), rgba(var(--color-accent-rgb), 0.6)); /* Accent gradient */
+            color: rgba(var(--color-text-white-rgb), 1);
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.2); /* Lighter border for highlight */
+            border-bottom: 1px solid rgba(var(--color-shadow-black-rgb), 0.3); /* Darker bottom for depth */
+            border-radius: 50%; /* Circle shape */
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(var(--color-shadow-black-rgb), 0.2), inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.3); /* Glassy shadow */
+            text-shadow: 0 1px 1px rgba(var(--color-shadow-black-rgb), 0.2);
+            backdrop-filter: blur(5px); /* Apply blur to button itself */
+            -webkit-backdrop-filter: blur(5px);
+            font-size: 0; /* Hide 'Send' text */
+        }
+        #send-button::after { /* Use a pseudo-element for the icon */
+            content: '➤'; /* Unicode for right arrow */
+            font-size: 1.2rem; /* Size of the arrow */
+            transform: rotate(-45deg) translateX(2px); /* Rotate for send icon, adjust position */
+            display: block; /* Ensure it's rendered */
+        }
+        #send-button:hover {
+            background: linear-gradient(to bottom, rgba(var(--color-accent-rgb), 0.9), rgba(var(--color-accent-rgb), 0.7)); /* Darker accent hover */
+            box-shadow: 0 4px 12px rgba(var(--color-shadow-black-rgb), 0.25), inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.4);
+            transform: translateY(-1px);
+        }
+        #send-button:active {
+            background: linear-gradient(to bottom, rgba(var(--color-accent-rgb), 0.9), rgba(var(--color-accent-rgb), 0.7));
+            box-shadow: 0 1px 4px rgba(var(--color-shadow-black-rgb), 0.15), inset 0 1px 2px rgba(var(--color-shadow-black-rgb), 0.2);
+            transform: translateY(0);
+        }
+
+        /* Modal Styles - Now fully glassmorphic */
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(var(--color-shadow-black-rgb), 0.6); /* Slightly lighter overlay */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        .modal-content {
+            background-color: rgba(36, 39, 43, 0.7); /* Darker transparent background */
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            padding: 1.5rem;
+            border-radius: 1rem; /* More rounded */
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.1); /* Subtle white border */
+            box-shadow: 0 12px 40px rgba(var(--color-shadow-black-rgb), 0.5); /* Stronger shadow */
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            color: rgba(var(--color-text-white-rgb), 1); /* White text for modals */
+        }
+        .modal-content h3 {
+            color: rgba(var(--color-text-white-rgb), 1);
+            font-size: 1.6rem; /* Slightly larger title */
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .modal-content p {
+            color: rgba(var(--color-text-white-rgb), 0.7); /* Lighter translucent text */
+        }
+        .modal-content input[type="text"],
+        .modal-content input[type="password"],
+        .modal-content input[type="color"] { /* Style color input too */
+            background-color: rgba(var(--color-text-white-rgb), 0.1); /* Translucent input background */
+            color: rgba(var(--color-text-white-rgb), 1);
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.2); /* Lighter border */
+            padding: 0.75rem 1rem;
+            border-radius: 0.6rem; /* More rounded */
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .modal-content input[type="text"]:focus,
+        .modal-content input[type="password"]:focus,
+        .modal-content input[type="color"]:focus { /* Focus style for color input */
+            border-color: rgba(var(--color-accent-rgb), 0.8); /* Accent focus */
+            box-shadow: 0 0 0 3px rgba(var(--color-accent-rgb), 0.4);
+            background-color: rgba(var(--color-text-white-rgb), 0.15);
+        }
+        /* Specific style for color input to make it fit */
+        .modal-content input[type="color"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            padding: 0.2rem;
+            height: 2.5rem; /* Standard height */
+            cursor: pointer;
+            border-radius: 0.6rem;
+            overflow: hidden; /* Hide default color picker border */
+        }
+        .modal-content input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        .modal-content input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 0.5rem;
+        }
+        .modal-content input[type="color"]::-moz-color-swatch {
+            border: none;
+            border-radius: 0.5rem;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+        .modal-button {
+            padding: 0.7rem 1.4rem; /* Larger buttons */
+            border-radius: 0.75rem; /* More rounded */
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            border: 1px solid transparent; /* Default transparent border */
+            box-shadow: 0 2px 5px rgba(var(--color-shadow-black-rgb), 0.1);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .modal-button.primary {
+            background: linear-gradient(to bottom, rgba(var(--color-accent-rgb), 0.8), rgba(var(--color-accent-rgb), 0.6)); /* Accent gradient */
+            color: rgba(var(--color-text-white-rgb), 1);
+            border-color: rgba(var(--color-text-white-rgb), 0.2);
+            box-shadow: 0 2px 8px rgba(var(--color-shadow-black-rgb), 0.2), inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.3);
+        }
+        .modal-button.primary:hover {
+            background: linear-gradient(to bottom, rgba(var(--color-accent-rgb), 0.9), rgba(var(--color-accent-rgb), 0.7)); /* Darker accent hover */
+            box-shadow: 0 4px 12px rgba(var(--color-shadow-black-rgb), 0.25), inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.4);
+        }
+        .modal-button.secondary {
+            background-color: rgba(var(--color-text-white-rgb), 0.15); /* Translucent gray */
+            color: rgba(var(--color-text-white-rgb), 1);
+            border-color: rgba(var(--color-text-white-rgb), 0.2);
+        }
+        .modal-button.secondary:hover {
+            background-color: rgba(var(--color-text-white-rgb), 0.25);
+            border-color: rgba(var(--color-text-white-rgb), 0.3);
+        }
+        .modal-button.danger { /* New danger button style */
+            background: linear-gradient(to bottom, rgba(var(--color-danger-rgb), 0.8), rgba(var(--color-danger-rgb), 0.6));
+            color: rgba(var(--color-text-white-rgb), 1);
+            border-color: rgba(var(--color-text-white-rgb), 0.2);
+        }
+        .modal-button.danger:hover {
+            background: linear-gradient(to bottom, rgba(var(--color-danger-rgb), 0.9), rgba(var(--color-danger-rgb), 0.7));
+        }
+
+        #room-list {
+            max-height: 250px;
+            overflow-y: auto;
+            background-color: rgba(var(--color-text-white-rgb), 0.05); /* Very light translucent background */
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.1);
+            border-radius: 0.6rem;
+            padding: 0.5rem;
+        }
+        .room-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0.5rem;
+            border-bottom: 1px solid rgba(var(--color-text-white-rgb), 0.08); /* Lighter translucent separator */
+            color: rgba(var(--color-text-white-rgb), 1);
+        }
+        .room-item:last-child {
+            border-bottom: none;
+        }
+        .room-item-name {
+            font-weight: 500;
+            color: rgba(var(--color-text-white-rgb), 1);
+        }
+        .room-item-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .room-item-password-input {
+            width: 100px;
+            padding: 0.4rem 0.6rem;
+            border-radius: 0.5rem;
+            background-color: rgba(var(--color-text-white-rgb), 0.1);
+            color: rgba(var(--color-text-white-rgb), 1);
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.2);
+            font-size: 0.85rem;
+        }
+        .room-item-password-input:focus {
+            border-color: rgba(var(--color-accent-rgb), 0.8);
+            box-shadow: 0 0 0 2px rgba(var(--color-accent-rgb), 0.4);
+        }
+        .join-room-button {
+            padding: 0.4rem 0.8rem;
+            background: linear-gradient(to bottom, rgba(var(--color-accent-rgb), 0.8), rgba(var(--color-accent-rgb), 0.6)); /* Accent gradient */
+            color: rgba(var(--color-text-white-rgb), 1);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+            border: 1px solid rgba(var(--color-text-white-rgb), 0.2);
+            box-shadow: inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.2);
+        }
+        .join-room-button:hover {
+            background: linear-gradient(to bottom, rgba(var(--color-accent-rgb), 0.9), rgba(var(--color-accent-rgb), 0.7)); /* Darker accent hover */
+            box-shadow: inset 0 1px 0 rgba(var(--color-text-white-rgb), 0.3);
+        }
+        .text-red-500 {
+            color: rgba(var(--color-error-rgb), 1); /* Error color from variable */
+        }
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #app-container {
+                flex-direction: column; /* Stack sidebar and main chat vertically */
+                height: 100vh; /* Use full viewport height */
+                border-radius: 0; /* Remove border-radius for full screen */
+                max-width: 100%; /* Ensure it uses full width */
+            }
+            #sidebar {
+                width: 100%; /* Sidebar takes full width */
+                min-height: 100px; /* Minimum height for channels bar */
+                max-height: 30vh; /* Max height for sidebar to leave room for chat */
+                flex-direction: column; /* Keep content stacked vertically */
+                overflow-x: hidden; /* No horizontal scroll in sidebar itself */
+                overflow-y: auto; /* Enable vertical scrolling for channels */
+                padding: 0.5rem 1rem;
+                border-right: none; /* No vertical border on mobile */
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08); /* Retain bottom border */
+            }
+            #sidebar-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.5rem 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                margin-bottom: 0.5rem;
+            }
+            #settings-button {
+                display: block; /* Ensure it's visible on smaller screens */
+                font-size: 1.5rem;
+                padding: 0.4rem 0.8rem;
+                color: rgba(var(--color-text-lightgray-rgb), 1);
+            }
+            #add-room-button {
+                margin-left: 0;
+            }
+            .chatroom-list {
+                flex-direction: column; /* Channels stack vertically */
+                flex-grow: 1;
+                overflow-y: auto; /* Ensure channels list itself scrolls */
+                padding: 0;
+            }
+            .chatroom-button {
+                flex-shrink: 0;
+                width: 100%; /* Buttons take full width of sidebar */
+                padding: 0.3rem 0.75rem; /* Make buttons vertically thinner */
+                font-size: 0.8rem; /* Slightly smaller font for thin buttons */
+            }
+            #main-chat-area {
+                flex-grow: 1; /* Main chat area takes remaining space */
+                min-height: 0; /* Allows shrinking to fit */
+            }
+            #user-info-display {
+                text-align: left; /* Align user info to left for consistency */
+                padding-left: 1.25rem; /* Match messages display padding */
+            }
+            #message-input-area {
+                padding: 0.6rem 1rem; /* Adjust padding for mobile input area */
+            }
+            #message-input {
+                padding: 0.6rem 1rem; /* Adjust padding for mobile input field */
+            }
+            #send-button {
+                width: 40px;
+                height: 40px;
+            }
+            #send-button::after {
+                font-size: 1rem;
+            }
+            #host-actions {
+                flex-wrap: wrap; /* Allow host actions to wrap if many buttons */
+                justify-content: flex-end; /* Align actions to the right */
+                gap: 0.3rem; /* Reduce gap for tighter fit */
+            }
+            .modal-content {
+                width: 95%; /* Wider modals on small screens */
+                padding: 1rem; /* Less padding in modals */
+                margin: 0.5rem; /* Some margin around modals */
+            }
+        }
+
+        /* Add a static message for auto-deletion */
+        #messages-display::before {
+            content: "Messages older than 48 hours are not displayed. Global doesn't work switch to general.";
+            display: block;
+            text-align: center;
+            font-size: 0.75rem;
+            color: rgba(var(--color-text-white-rgb), 0.4);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px dashed rgba(var(--color-text-white-rgb), 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <!-- Left Sidebar for Channels -->
+        <div id="sidebar">
+            <div id="sidebar-header">
+                Channels
+                <button id="add-room-button" title="Create or Browse Rooms">+</button>
+            </div>
+            <div class="chatroom-list" id="chatroom-selection">
+                <button class="chatroom-button active" data-room-id="global">global</button>
+                <button class="chatroom-button" data-room-id="general">general</button>
+                <button class="chatroom-button" data-room-id="random">random</button>
+                <button class="chatroom-button" data-room-id="tech">tech</button>
+            </div>
+            <!-- Settings button moved to a new footer div -->
+            <div id="sidebar-footer">
+                <button id="settings-button" title="Settings">⚙️</button>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div id="main-chat-area">
+            <div id="chat-header">
+                <span id="current-room-name">/global</span>
+                <div id="host-actions" class="hidden">
+                    <button id="delete-room-button" class="host-action-button delete">End Room</button>
+                    <!-- New dropdown for kick/ban/unban -->
+                    <div class="relative inline-block text-left">
+                        <button type="button" id="moderation-menu-button" class="host-action-button">
+                            Moderation ▼
+                        </button>
+                        <div id="moderation-menu" class="kick-ban-options hidden">
+                            <button id="unban-users-button">Unban Users</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="user-info-display"></div>
+            </div>
+
+            <div id="messages-display">
+                <!-- Messages will be appended here -->
+            </div>
+
+            <!-- Message Input Area -->
+            <div id="message-input-area">
+                <input type="file" id="image-file-input" accept="image/*">
+                <button id="image-upload-button" title="Upload Image">🖼️</button>
+                <input
+                    type="text"
+                    id="message-input"
+                    placeholder="Message /global"
+                    class="rounded-md"
+                />
+                <button
+                    id="send-button"
+                    class="rounded-md"
+                >
+                    Send
+                </button>
+            </div>
+        </div>
+
+        <!-- Set Username Modal -->
+        <div id="set-username-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>Set Your Username</h3>
+                <p class="text-sm" style="color: rgba(var(--color-text-white-rgb), 0.7);">Please choose a username to participate in chat.</p>
+                <input type="text" id="username-input" placeholder="Enter your desired username" maxlength="20" />
+                <p id="username-error" class="text-red-500 text-sm hidden"></p>
+                <div class="modal-buttons">
+                    <button id="set-username-button" class="modal-button primary">Set Username</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Room Options Modal -->
+        <div id="room-options-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>Room Options</h3>
+                <p class="text-sm" style="color: rgba(var(--color-text-white-rgb), 0.7);">What would you like to do with rooms?</p>
+                <div class="flex flex-col gap-3 mt-4">
+                    <button id="open-create-room" class="modal-button primary w-full">Create New Room</button>
+                    <button id="open-room-browser" class="modal-button secondary w-full">Browse Existing Rooms</button>
+                    <button id="open-join-by-code-modal" class="modal-button secondary w-full">Join by Room Code</button>
+                </div>
+                <div class="modal-buttons">
+                    <button id="cancel-room-options" class="modal-button secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>Settings</h3>
+                <label for="username-settings-input" class="block mb-2 font-medium" style="color: rgba(var(--color-text-white-rgb), 0.9);">Your Username:</label>
+                <input type="text" id="username-settings-input" placeholder="Change your username" maxlength="20" />
+                <p id="username-settings-error" class="text-red-500 text-sm hidden"></p>
+                <label for="accent-color-picker" class="block mb-2 font-medium" style="color: rgba(var(--color-text-white-rgb), 0.9);">Choose Accent Color:</label>
+                <input type="color" id="accent-color-picker" value="#FFA500" />
+                <div class="modal-buttons">
+                    <button id="cancel-settings" class="modal-button secondary">Cancel</button>
+                    <button id="save-settings" class="modal-button primary">Save Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Room Modal -->
+        <div id="create-room-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>Create New Room</h3>
+                <input type="text" id="new-room-name" placeholder="Room Name" />
+                <input type="password" id="new-room-password" placeholder="Password (optional)" />
+                <div class="flex items-center mt-2">
+                    <input type="checkbox" id="unlisted-room-checkbox" class="mr-2 rounded-md">
+                    <label for="unlisted-room-checkbox" style="color: rgba(var(--color-text-white-rgb), 0.8);">Make room unlisted (join by code)</label>
+                </div>
+                <p id="room-code-display" class="hidden text-sm mt-2" style="color: rgba(var(--color-text-lightgray-rgb), 0.9);">Room Code: <span id="generated-room-code" class="font-bold text-white"></span></p>
+                <p id="create-room-error" class="text-red-500 text-sm hidden"></p>
+                <div class="modal-buttons">
+                    <button id="cancel-create-room" class="modal-button secondary">Cancel</button>
+                    <button id="confirm-create-room" class="modal-button primary">Create Room</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm Delete Room Modal -->
+        <div id="confirm-delete-room-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>Confirm Room Deletion</h3>
+                <p class="text-sm" style="color: rgba(var(--color-text-white-rgb), 0.7);">Are you sure you want to delete this room? This action cannot be undone.</p>
+                <div class="modal-buttons">
+                    <button id="cancel-delete-room" class="modal-button secondary">Cancel</button>
+                    <button id="confirm-delete-room" class="modal-button danger">Delete Room</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Room Browser Modal -->
+        <div id="room-browser-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>Browse Rooms</h3>
+                <div id="room-list">
+                    <!-- Rooms will be loaded here -->
+                </div>
+                <p id="join-room-error" class="text-red-500 text-sm hidden"></p>
+                <div class="modal-buttons">
+                    <button id="close-room-browser" class="modal-button secondary">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unban Users Modal -->
+        <div id="unban-users-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>Unban Users</h3>
+                <p class="text-sm" style="color: rgba(var(--color-text-white-rgb), 0.7);">Select users to unban from /<span id="unban-room-name"></span>:</p>
+                <div id="banned-users-list" class="max-h-48 overflow-y-auto bg-gray-700/50 rounded-md p-2">
+                    <!-- Banned users will be loaded here -->
+                </div>
+                <p id="unban-error" class="text-red-500 text-sm hidden"></p>
+                <div class="modal-buttons">
+                    <button id="cancel-unban" class="modal-button secondary">Cancel</button>
+                    <button id="confirm-unban-selected" class="modal-button primary">Unban Selected</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Join by Room Code Modal -->
+        <div id="join-by-code-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3>Join Room by Code</h3>
+                <p class="text-sm" style="color: rgba(var(--color-text-white-rgb), 0.7);">Enter the room code to join an unlisted room.</p>
+                <input type="text" id="room-code-input" placeholder="Enter room code" maxlength="10" class="uppercase" />
+                <input type="password" id="room-code-password-input" placeholder="Password (if any)" />
+                <p id="join-code-error" class="text-red-500 text-sm hidden"></p>
+                <div class="modal-buttons">
+                    <button id="cancel-join-by-code" class="modal-button secondary">Cancel</button>
+                    <button id="confirm-join-by-code" class="modal-button primary">Join Room</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Import Firebase Storage modules
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+
+        // Get references to DOM elements
+        const messagesDisplay = document.getElementById('messages-display');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const chatroomSelection = document.getElementById('chatroom-selection');
+        const userInfoDisplay = document.getElementById('user-info-display');
+        const addRoomButton = document.getElementById('add-room-button');
+        const currentRoomNameDisplay = document.getElementById('current-room-name');
+        const hostActionsDiv = document.getElementById('host-actions');
+        const deleteRoomButton = document.getElementById('delete-room-button'); 
+
+        // Image upload elements
+        const imageFileInput = document.getElementById('image-file-input');
+        const imageUploadButton = document.getElementById('image-upload-button');
+
+        // Set Username Modal elements
+        const setUsernameModal = document.getElementById('set-username-modal');
+        const usernameInput = document.getElementById('username-input');
+        const usernameError = document.getElementById('username-error');
+        const setUsernameButton = document.getElementById('set-username-button');
+
+        // Room Options Modal elements
+        const roomOptionsModal = document.getElementById('room-options-modal');
+        const openCreateRoomButton = document.getElementById('open-create-room');
+        const openRoomBrowserButton = document.getElementById('open-room-browser');
+        const cancelRoomOptionsButton = document.getElementById('cancel-room-options');
+        const openJoinByCodeModalButton = document.getElementById('open-join-by-code-modal'); // New button
+
+        // Settings Modal elements
+        const settingsButton = document.getElementById('settings-button');
+        const settingsModal = document.getElementById('settings-modal');
+        const usernameSettingsInput = document.getElementById('username-settings-input');
+        const usernameSettingsError = document.getElementById('username-settings-error');
+        const accentColorPicker = document.getElementById('accent-color-picker');
+        const saveSettingsButton = document.getElementById('save-settings');
+        const cancelSettingsButton = document.getElementById('cancel-settings');
+
+        // Create Room Modal elements
+        const createRoomModal = document.getElementById('create-room-modal');
+        const newRoomNameInput = document.getElementById('new-room-name');
+        const newRoomPasswordInput = document.getElementById('new-room-password');
+        const unlistedRoomCheckbox = document.getElementById('unlisted-room-checkbox'); // New checkbox
+        const roomCodeDisplay = document.getElementById('room-code-display'); // New element
+        const generatedRoomCodeSpan = document.getElementById('generated-room-code'); // New element
+        const createRoomError = document.getElementById('create-room-error');
+        const cancelCreateRoomButton = document.getElementById('cancel-create-room');
+        const confirmCreateRoomButton = document.getElementById('confirm-create-room');
+
+        // Confirm Delete Room Modal elements
+        const confirmDeleteRoomModal = document.getElementById('confirm-delete-room-modal');
+        const cancelDeleteRoomButton = document.getElementById('cancel-delete-room');
+        const confirmDeleteRoomButtonAction = document.getElementById('confirm-delete-room');
+
+        // Room Browser Modal elements
+        const roomBrowserModal = document.getElementById('room-browser-modal');
+        const roomListContainer = document.getElementById('room-list');
+        const joinRoomError = document.getElementById('join-room-error');
+        const closeRoomBrowserButton = document.getElementById('close-room-browser');
+
+        // Moderation Menu elements
+        const moderationMenuButton = document.getElementById('moderation-menu-button'); // New button
+        const moderationMenu = document.getElementById('moderation-menu'); // New menu div
+        const unbanUsersButton = document.getElementById('unban-users-button'); // New button
+
+        // Unban Users Modal elements
+        const unbanUsersModal = document.getElementById('unban-users-modal');
+        const unbanRoomNameSpan = document.getElementById('unban-room-name');
+        const bannedUsersListDiv = document.getElementById('banned-users-list');
+        const unbanError = document.getElementById('unban-error');
+        const cancelUnbanButton = document.getElementById('cancel-unban');
+        const confirmUnbanSelectedButton = document.getElementById('confirm-unban-selected');
+
+        // Join by Room Code Modal elements
+        const joinByCodeModal = document.getElementById('join-by-code-modal');
+        const roomCodeInput = document.getElementById('room-code-input');
+        const roomCodePasswordInput = document.getElementById('room-code-password-input');
+        const joinCodeError = document.getElementById('join-code-error');
+        const cancelJoinByCodeButton = document.getElementById('cancel-join-by-code');
+        const confirmJoinByCodeButton = document.getElementById('confirm-join-by-code');
+
+
+        // --- Global State Variables ---
+        const joinedRooms = new Map([
+            ['global', 'global'],
+            ['general', 'general'],
+            ['random', 'random'],
+            ['tech', 'tech']
+        ]);
+        const cachedUsernames = new Map();
+        const profanities = ['fuck', 'shit', 'asshole', 'bitch', 'cunt', 'damn'];
+
+        let currentUserId = 'anonymous';
+        let currentUserName = 'Anonymous';
+        let currentRoomId = 'global';
+        let currentRoomDisplayName = 'global';
+        let currentRoomCreatorId = null;
+        let unsubscribeFromMessages = null;
+        let unsubscribeFromKickedUsers = null;
+        let unsubscribeFromBannedUsers = null;
+        const kickedUsersInCurrentRoom = new Set();
+        const bannedUsersInCurrentRoom = new Set();
+        let isUploadingImage = false;
+
+        // Spam Filter Constants
+        const SPAM_THRESHOLD_SECONDS = 5; // How many seconds to look back for repetitive messages
+        const SPAM_MESSAGE_COUNT_THRESHOLD = 3; // How many identical messages within SPAM_THRESHOLD_SECONDS to consider spam
+        const RATE_LIMIT_SECONDS = 3; // How many seconds for rate limit window
+        const MAX_MESSAGES_PER_RATE_WINDOW = 5; // Max messages allowed in RATE_LIMIT_SECONDS
+
+        // Spam Filter Data (in-memory, per-user)
+        const userMessageTimestamps = new Map(); // Stores timestamps of messages sent by each user: Map<userId, [timestamp1, timestamp2]>
+        const userMessageContentHistory = new Map(); // Stores content history for repetitive spam detection: Map<userId, [{text: "normalized_text", timestamp: ts}]>
+
+        // Default accent color in hex
+        const DEFAULT_ACCENT_COLOR = '#FFA500'; // Orange
+
+        // --- Firebase Initialization and Authentication ---
+        const appId = 'dposws'; // Your chosen app ID
+        const firebaseConfig = {
+          apiKey: "AIzaSyADcHwh_c6_sjxomFh9lfiprYHxiC8gCXw",
+          authDomain: "dposws.firebaseapp.com",
+          projectId: "dposws",
+          storageBucket: "dposws.firebasestorage.app",
+          messagingSenderId: "479339410581",
+          appId: "1:479339410581:web:60c181ad6b312c6654579c",
+          measurementId: "G-QQX5496097"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // Firestore collections
+        const roomsMetadataCollectionRef = collection(db, `artifacts/${appId}/public/data/rooms_metadata`);
+        const userProfilesCollectionRef = collection(db, `artifacts/${appId}/public/data/user_profiles`);
+
+        onAuthStateChanged(auth, async (user) => {
+            console.log('Firebase Auth State Changed. User:', user ? user.uid : 'null');
+            if (user) {
+                currentUserId = user.uid;
+                await checkAndSetUsernameAndAccentColor();
+            } else {
+                try {
+                    console.log('Attempting anonymous sign-in...');
+                    await signInAnonymously(auth);
+                    currentUserId = auth.currentUser.uid;
+                    console.log('Sign-in successful. User ID:', currentUserId);
+                    await checkAndSetUsernameAndAccentColor();
+                } catch (error) {
+                    console.error("Error during authentication:", error);
+                    currentUserId = 'guest_' + Math.random().toString(36).substring(2, 9);
+                    console.warn('Authentication failed, using guest ID:', currentUserId);
+                    await checkAndSetUsernameAndAccentColor();
+                }
+            }
+        });
+
+        // --- Utility Functions ---
+        /**
+         * Converts a hex color string to an RGB string (e.g., "#FFA500" -> "255, 165, 0").
+         * @param {string} hex - The hex color string.
+         * @returns {string} - The RGB string.
+         */
+        function hexToRgb(hex) {
+            const r = parseInt(hex.substring(1, 3), 16);
+            const g = parseInt(hex.substring(3, 5), 16);
+            const b = parseInt(hex.substring(5, 7), 16);
+            return `${r}, ${g}, ${b}`;
+        }
+
+        /**
+         * Applies the given hex color as the accent color by setting CSS variables.
+         * @param {string} hexColor - The hex color string (e.g., "#FF0000").
+         */
+        function applyAccentColor(hexColor) {
+            const rgb = hexToRgb(hexColor);
+            document.documentElement.style.setProperty('--color-accent-rgb', rgb);
+            console.log("Applied accent color:", hexColor, "RGB:", rgb);
+        }
+
+        /**
+         * Filters message text for profanity.
+         * @param {string} text - The input text.
+         * @returns {string} - The filtered text.
+         */
+        function applyFilter(text) {
+            let filteredText = text;
+            // Iterate over each profanity and replace it with asterisks
+            profanities.forEach(word => {
+                // Create a regular expression for the word, case-insensitive, whole word match
+                const regex = new RegExp(`\\b${word}\\b`, 'gi');
+                filteredText = filteredText.replace(regex, '*'.repeat(word.length));
+            });
+            return filteredText;
+        }
+
+        // --- Username & Accent Color Setup Logic ---
+        async function checkAndSetUsernameAndAccentColor() {
+            let userProfile = null;
+            try {
+                const userDocRef = doc(userProfilesCollectionRef, currentUserId);
+                console.log("checkAndSetUsernameAndAccentColor: Attempting to fetch user profile for ID:", currentUserId);
+                const userDocSnap = await getDoc(userDocRef);
+
+                if (userDocSnap.exists()) {
+                    userProfile = userDocSnap.data();
+                    console.log("checkAndSetUsernameAndAccentColor: User profile found:", userProfile);
+                } else {
+                    console.log("checkAndSetUsernameAndAccentColor: User profile NOT found for ID:", currentUserId);
+                }
+            } catch (e) {
+                console.error("checkAndSetUsernameAndAccentColor: Error fetching user profile:", e);
+            }
+
+            if (userProfile && userProfile.username) {
+                currentUserName = userProfile.username;
+                cachedUsernames.set(currentUserId, currentUserName);
+                console.log("checkAndSetUsernameAndAccentColor: Username loaded from profile:", currentUserName);
+                
+                const savedAccentColor = userProfile.preferredAccentColor;
+                applyAccentColor(savedAccentColor || DEFAULT_ACCENT_COLOR);
+                accentColorPicker.value = savedAccentColor || DEFAULT_ACCENT_COLOR;
+
+                initializeChatAndUI();
+            } else {
+                console.log("checkAndSetUsernameAndAccentColor: Prompting for username (profile or username missing).");
+                showModal(setUsernameModal);
+                usernameInput.focus();
+                accentColorPicker.value = DEFAULT_ACCENT_COLOR;
+            }
+        }
+
+        setUsernameButton.addEventListener('click', async () => {
+            const username = usernameInput.value.trim();
+            if (!username) {
+                usernameError.textContent = "Username cannot be empty.";
+                usernameError.classList.remove('hidden');
+                return;
+            }
+            if (username.length > 20) {
+                usernameError.textContent = "Username cannot be longer than 20 characters.";
+                usernameError.classList.remove('hidden');
+                return;
+            }
+            if (profanities.some(word => username.toLowerCase().includes(word))) {
+                usernameError.textContent = "Username contains inappropriate language.";
+                usernameError.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                usernameError.classList.add('hidden');
+                const userDocRef = doc(userProfilesCollectionRef, currentUserId);
+                const chosenAccentColor = accentColorPicker.value;
+                
+                console.log("setUsernameButton: Attempting to set username to:", username, "and accent color to:", chosenAccentColor, "for ID:", currentUserId);
+                await setDoc(userDocRef, {
+                    username: username,
+                    last_updated: serverTimestamp(),
+                    preferredAccentColor: chosenAccentColor
+                }, { merge: true });
+                console.log("setUsernameButton: setDoc successful for username and accent color.");
+
+                currentUserName = username;
+                cachedUsernames.set(currentUserId, currentUserName);
+                applyAccentColor(chosenAccentColor);
+                hideModal(setUsernameModal);
+                console.log("setUsernameButton: Username successfully set in app state, accent color applied, and UI re-initialized.");
+                initializeChatAndUI();
+            } catch (e) {
+                console.error("setUsernameButton: Error setting username:", e);
+                usernameError.textContent = "Failed to set username. Please try again.";
+                usernameError.classList.remove('hidden');
+            }
+        });
+
+        usernameInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                setUsernameButton.click();
+            }
+        });
+
+        function initializeChatAndUI() {
+            console.log('initializeChatAndUI: Initializing chat and UI with username:', currentUserName);
+            userInfoDisplay.textContent = `You: ${currentUserName} (ID: ${currentUserId.substring(0, 8)}...)`;
+            updateChatHeader();
+            
+            joinedRooms.forEach((name, id) => {
+                if (!document.querySelector(`.chatroom-button[data-room-id="${id}"]`)) {
+                    addRoomButtonToSelection(id, name);
+                }
+            });
+
+            switchChatroom(currentRoomId, currentRoomDisplayName);
+        }
+
+        // --- Modal Management ---
+        function showModal(modalElement) {
+            modalElement.classList.remove('hidden');
+        }
+
+        function hideModal(modalElement) {
+            modalElement.classList.add('hidden');
+            createRoomError.classList.add('hidden');
+            joinRoomError.classList.add('hidden');
+            usernameError.classList.add('hidden');
+            usernameSettingsError.classList.add('hidden');
+            joinCodeError.classList.add('hidden');
+            unbanError.classList.add('hidden');
+        }
+
+        // --- Settings Modal Logic ---
+        settingsButton.addEventListener('click', async () => {
+            console.log("Settings button clicked.");
+            const userDocRef = doc(userProfilesCollectionRef, currentUserId);
+            const userDocSnap = await getDoc(userDocRef);
+            let userProfile = {};
+            if (userDocSnap.exists()) {
+                userProfile = userDocSnap.data();
+            }
+
+            usernameSettingsInput.value = userProfile.username || currentUserName;
+            usernameSettingsError.classList.add('hidden');
+
+            const savedAccentColor = userProfile.preferredAccentColor;
+            accentColorPicker.value = savedAccentColor || DEFAULT_ACCENT_COLOR;
+            console.log("Settings: Loaded saved accent color:", accentColorPicker.value);
+
+            showModal(settingsModal);
+        });
+
+        saveSettingsButton.addEventListener('click', async () => {
+            const newAccentColor = accentColorPicker.value;
+            const newUsername = usernameSettingsInput.value.trim();
+
+            if (!newUsername) {
+                usernameSettingsError.textContent = "Username cannot be empty.";
+                usernameSettingsError.classList.remove('hidden');
+                return;
+            }
+            if (newUsername.length > 20) {
+                usernameSettingsError.textContent = "Username cannot be longer than 20 characters.";
+                usernameSettingsError.classList.remove('hidden');
+                return;
+            }
+            if (profanities.some(word => newUsername.toLowerCase().includes(word))) {
+                usernameSettingsError.textContent = "Username contains inappropriate language.";
+                usernameSettingsError.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                usernameSettingsError.classList.add('hidden');
+
+                const userDocRef = doc(userProfilesCollectionRef, currentUserId);
+                
+                await updateDoc(userDocRef, { 
+                    username: newUsername,
+                    preferredAccentColor: newAccentColor,
+                    last_updated: serverTimestamp()
+                });
+                console.log("Settings: Username and accent color saved to Firestore.");
+
+                currentUserName = newUsername;
+                cachedUsernames.set(currentUserId, currentUserName);
+                userInfoDisplay.textContent = `You: ${currentUserName} (ID: ${currentUserId.substring(0, 8)}...)`;
+                applyAccentColor(newAccentColor);
+
+                hideModal(settingsModal);
+                console.log("Settings: Changes applied and modal hidden.");
+            } catch (e) {
+                console.error("Error saving settings:", e);
+                usernameSettingsError.textContent = `Failed to save settings: ${e.message}`;
+                usernameSettingsError.classList.remove('hidden');
+            }
+        });
+
+        cancelSettingsButton.addEventListener('click', async () => {
+            console.log("Settings cancelled.");
+            hideModal(settingsModal);
+        });
+
+
+        // --- Room Options Modal Logic ---
+        addRoomButton.addEventListener('click', () => {
+            console.log("Add Room button clicked.");
+            showModal(roomOptionsModal);
+        });
+
+        openCreateRoomButton.addEventListener('click', () => {
+            console.log("Create Room button clicked.");
+            hideModal(roomOptionsModal);
+            showModal(createRoomModal);
+            newRoomNameInput.focus();
+        });
+
+        openRoomBrowserButton.addEventListener('click', () => {
+            console.log("Browse Rooms button clicked.");
+            hideModal(roomOptionsModal);
+            openRoomBrowser();
+        });
+
+        openJoinByCodeModalButton.addEventListener('click', () => {
+            console.log("Join by Room Code button clicked.");
+            hideModal(roomOptionsModal);
+            roomCodeInput.value = '';
+            roomCodePasswordInput.value = '';
+            showModal(joinByCodeModal);
+            roomCodeInput.focus();
+        });
+
+        cancelRoomOptionsButton.addEventListener('click', () => {
+            console.log("Room Options cancelled.");
+            hideModal(roomOptionsModal);
+        });
+
+
+        // --- Chatroom Management ---
+
+        function updateChatHeader() {
+            currentRoomNameDisplay.textContent = `/${currentRoomDisplayName}`;
+            messageInput.placeholder = `Message /${currentRoomDisplayName}`;
+            console.log("updateChatHeader: Room display name updated:", currentRoomDisplayName);
+
+            if (currentRoomCreatorId === currentUserId && !['global', 'general', 'random', 'tech'].includes(currentRoomId)) {
+                hostActionsDiv.classList.remove('hidden');
+                console.log("updateChatHeader: Showing host actions.");
+            } else {
+                hostActionsDiv.classList.add('hidden');
+                console.log("updateChatHeader: Hiding host actions.");
+            }
+        }
+
+        /**
+         * Switches the active chatroom and updates the UI and Firestore listener.
+         * @param {string} newRoomId - The ID of the chatroom to switch to.
+         * @param {string} newRoomName - The display name of the chatroom.
+         */
+        async function switchChatroom(newRoomId, newRoomName) {
+            console.log(`switchChatroom: Attempting to switch to room: ${newRoomId} (${newRoomName})`);
+            if (newRoomId === currentRoomId) {
+                console.log("switchChatroom: Already in this room, no switch needed.");
+                return;
+            }
+
+            // Unsubscribe from old listeners
+            if (unsubscribeFromMessages) {
+                unsubscribeFromMessages();
+                console.log("switchChatroom: Unsubscribed from old messages listener.");
+            }
+            if (unsubscribeFromKickedUsers) {
+                unsubscribeFromKickedUsers();
+                console.log("switchChatroom: Unsubscribed from old kicked users listener.");
+            }
+            if (unsubscribeFromBannedUsers) {
+                unsubscribeFromBannedUsers();
+                console.log("switchChatroom: Unsubscribed from old banned users listener.");
+            }
+            kickedUsersInCurrentRoom.clear();
+            bannedUsersInCurrentRoom.clear();
+
+            currentRoomId = newRoomId;
+            currentRoomDisplayName = newRoomName;
+            messagesDisplay.innerHTML = '';
+            console.log(`switchChatroom: Switched internal state to chatroom: ${currentRoomId} (${currentRoomDisplayName})`);
+
+            if (['global', 'general', 'random', 'tech'].includes(newRoomId)) {
+                console.log(`switchChatroom: Handling pre-defined room '${newRoomId}'. Ensuring metadata document exists.`);
+                const roomDocRef = doc(roomsMetadataCollectionRef, newRoomId);
+                try {
+                    await setDoc(roomDocRef, {
+                        name: newRoomName,
+                        creatorId: null,
+                        isUnlisted: false,
+                        createdAt: serverTimestamp(),
+                        lastActivity: serverTimestamp()
+                    }, { merge: true });
+                    console.log(`switchChatroom: Ensured metadata for '${newRoomId}' exists/updated.`);
+                    currentRoomCreatorId = null;
+                } catch (e) {
+                    console.error(`switchChatroom: Error ensuring metadata for pre-defined room '${newRoomId}':`, e);
+                    currentRoomCreatorId = null;
+                }
+            } else {
+                try {
+                    const roomDocSnap = await getDoc(doc(roomsMetadataCollectionRef, newRoomId));
+                    if (roomDocSnap.exists()) {
+                        currentRoomCreatorId = roomDocSnap.data().creatorId;
+                        console.log("switchChatroom: Custom room creator ID fetched:", currentRoomCreatorId);
+                    } else {
+                        currentRoomCreatorId = null;
+                        console.warn("switchChatroom: Room metadata not found for custom room:", newRoomId);
+                    }
+                } catch (e) {
+                    console.error("switchChatroom: Error fetching room metadata for custom room:", e);
+                    currentRoomCreatorId = null;
+                }
+            }
+
+
+            document.querySelectorAll('.chatroom-button').forEach(button => {
+                if (button.dataset.roomId === newRoomId) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            });
+            console.log("switchChatroom: Chatroom buttons updated.");
+
+            updateChatHeader();
+            listenForMessages(currentRoomId);
+            listenForKickedUsers(currentRoomId);
+            listenForBannedUsers(currentRoomId);
+        }
+
+        // Event listener for chatroom buttons (fixed rooms and dynamically added)
+        chatroomSelection.addEventListener('click', (event) => {
+            let targetButton = event.target;
+            if (!targetButton.classList.contains('chatroom-button')) {
+                targetButton = targetButton.closest('.chatroom-button');
+            }
+
+            if (targetButton && targetButton.classList.contains('chatroom-button')) {
+                const newRoomId = targetButton.dataset.roomId;
+                const newRoomName = targetButton.dataset.roomName || targetButton.textContent.trim();
+                switchChatroom(newRoomId, newRoomName);
+            }
+        });
+
+        // --- Create Room Logic ---
+        /**
+         * Generates a random alphanumeric room code.
+         * @returns {string} - A 6-character room code.
+         */
+        function generateRoomCode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 6; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        unlistedRoomCheckbox.addEventListener('change', () => {
+            if (unlistedRoomCheckbox.checked) {
+                roomCodeDisplay.classList.remove('hidden');
+                generatedRoomCodeSpan.textContent = "Will be generated upon creation";
+            } else {
+                roomCodeDisplay.classList.add('hidden');
+            }
+        });
+
+
+        cancelCreateRoomButton.addEventListener('click', () => {
+            console.log("Create Room cancelled.");
+            hideModal(createRoomModal);
+            newRoomNameInput.value = '';
+            newRoomPasswordInput.value = '';
+            unlistedRoomCheckbox.checked = false;
+            roomCodeDisplay.classList.add('hidden');
+            generatedRoomCodeSpan.textContent = '';
+        });
+
+        confirmCreateRoomButton.addEventListener('click', async () => {
+            console.log("Confirm Create Room clicked.");
+            const roomName = newRoomNameInput.value.trim();
+            const roomPassword = newRoomPasswordInput.value.trim();
+            const isUnlisted = unlistedRoomCheckbox.checked;
+            let roomCode = null;
+
+            if (!roomName) {
+                createRoomError.textContent = "Room name cannot be empty.";
+                createRoomError.classList.remove('hidden');
+                return;
+            }
+            if (roomName.length > 25) {
+                createRoomError.textContent = "Room name too long (max 25 characters).";
+                createRoomError.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                // Check if room name already exists
+                const nameQuery = query(roomsMetadataCollectionRef, where('name', '==', roomName));
+                const nameSnapshot = await getDocs(nameQuery);
+                if (!nameSnapshot.empty) {
+                    createRoomError.textContent = "A room with this name already exists. Please choose another.";
+                    createRoomError.classList.remove('hidden');
+                    return;
+                }
+
+                if (isUnlisted) {
+                    // Generate unique room code
+                    let codeUnique = false;
+                    while (!codeUnique) {
+                        roomCode = generateRoomCode();
+                        const codeQuery = query(roomsMetadataCollectionRef, where('roomCode', '==', roomCode));
+                        const codeSnapshot = await getDocs(codeQuery);
+                        if (codeSnapshot.empty) {
+                            codeUnique = true;
+                        }
+                    }
+                }
+
+                createRoomError.classList.add('hidden');
+
+                const newRoomDocRef = await addDoc(roomsMetadataCollectionRef, {
+                    name: roomName,
+                    password: roomPassword || null,
+                    creatorId: currentUserId,
+                    createdAt: serverTimestamp(),
+                    lastActivity: serverTimestamp(),
+                    isUnlisted: isUnlisted,
+                    roomCode: roomCode
+                });
+
+                const newRoomId = newRoomDocRef.id;
+                console.log(`Room created with ID: ${newRoomId}, Name: ${roomName}, Unlisted: ${isUnlisted}, Code: ${roomCode}`);
+                
+                // Display generated code if unlisted
+                if (isUnlisted) {
+                    generatedRoomCodeSpan.textContent = roomCode;
+                    roomCodeDisplay.classList.remove('hidden');
+                }
+
+                addRoomButtonToSelection(newRoomId, roomName);
+                joinedRooms.set(newRoomId, roomName);
+
+                // Optionally, hide the modal and switch to the new room immediately
+                // Or just show the code and let user close it
+                // For now, let's keep it open to show the code, then allow manual close/switch
+                // hideModal(createRoomModal); // Don't hide yet, show code
+                // switchChatroom(newRoomId, roomName);
+            } catch (e) {
+                console.error("Error creating room:", e);
+                createRoomError.textContent = "Failed to create room. Please try again.";
+                createRoomError.classList.remove('hidden');
+            }
+        });
+
+        function addRoomButtonToSelection(roomId, roomName) {
+            if (!document.querySelector(`.chatroom-button[data-room-id="${roomId}"]`)) {
+                const button = document.createElement('button');
+                button.classList.add('chatroom-button');
+                button.dataset.roomId = roomId;
+                button.dataset.roomName = roomName;
+                button.textContent = roomName;
+                chatroomSelection.appendChild(button);
+                console.log(`Added room button for ${roomName} (${roomId})`);
+            }
+        }
+
+        // --- Room Browser Logic ---
+        closeRoomBrowserButton.addEventListener('click', () => {
+            console.log("Close Room Browser clicked.");
+            hideModal(roomBrowserModal);
+        });
+
+        async function openRoomBrowser() {
+            console.log("Opening Room Browser.");
+            showModal(roomBrowserModal);
+            roomListContainer.innerHTML = '<p class="text-center" style="color: rgba(var(--color-text-white-rgb), 0.7);">Loading rooms...</p>';
+            joinRoomError.classList.add('hidden');
+
+            try {
+                // Query only for rooms that are NOT unlisted OR are created by the current user (for visibility)
+                const q = query(roomsMetadataCollectionRef, orderBy('createdAt', 'desc'));
+                const querySnapshot = await getDocs(q);
+                roomListContainer.innerHTML = '';
+
+                let foundRooms = false;
+                querySnapshot.forEach(doc => {
+                    const room = doc.data();
+                    const roomId = doc.id;
+                    
+                    // Filter out pre-defined rooms and unlisted rooms not created by current user
+                    if (['global', 'general', 'random', 'tech'].includes(roomId) || (room.isUnlisted && room.creatorId !== currentUserId)) {
+                        return;
+                    }
+
+                    foundRooms = true;
+                    const hasPassword = room.password && room.password.length > 0;
+                    const roomItem = document.createElement('div');
+                    roomItem.classList.add('room-item');
+                    roomItem.innerHTML = `
+                        <span class="room-item-name">/${room.name} ${hasPassword ? '(🔒 Protected)' : ''} ${room.isUnlisted && room.creatorId === currentUserId ? '(Code: ' + room.roomCode + ')' : ''}</span>
+                        <div class="room-item-actions">
+                            ${hasPassword ? `<input type="password" placeholder="Password" class="room-item-password-input" data-room-id="${roomId}">` : ''}
+                            <button class="join-room-button" data-room-id="${roomId}" data-has-password="${hasPassword}" data-room-name="${room.name}">Join</button>
+                        </div>
+                    `;
+                    roomListContainer.appendChild(roomItem);
+                });
+
+                if (!foundRooms) {
+                    roomListContainer.innerHTML = '<p class="text-center" style="color: rgba(var(--color-text-white-rgb), 0.7);">No public rooms found. Create one!</p>';
+                }
+                console.log("Rooms loaded into browser.");
+            } catch (e) {
+                console.error("Error loading rooms:", e);
+                roomListContainer.innerHTML = '<p class="text-center text-red-500">Failed to load rooms.</p>';
+            }
+        }
+
+        roomListContainer.addEventListener('click', async (event) => {
+            if (event.target.classList.contains('join-room-button')) {
+                const button = event.target;
+                const roomId = button.dataset.roomId;
+                const roomName = button.dataset.roomName;
+                const hasPassword = button.dataset.hasPassword === 'true';
+                let enteredPassword = '';
+
+                if (hasPassword) {
+                    const passwordInput = roomListContainer.querySelector(`.room-item-password-input[data-room-id="${roomId}"]`);
+                    enteredPassword = passwordInput ? passwordInput.value : '';
+                }
+
+                await attemptJoinRoom(roomId, roomName, enteredPassword);
+            }
+        });
+
+        // --- Join by Code Logic ---
+        cancelJoinByCodeButton.addEventListener('click', () => {
+            console.log("Join by Code cancelled.");
+            hideModal(joinByCodeModal);
+            roomCodeInput.value = '';
+            roomCodePasswordInput.value = '';
+        });
+
+        confirmJoinByCodeButton.addEventListener('click', async () => {
+            console.log("Confirm Join by Code clicked.");
+            const code = roomCodeInput.value.trim().toUpperCase();
+            const password = roomCodePasswordInput.value.trim();
+
+            if (!code) {
+                joinCodeError.textContent = "Please enter a room code.";
+                joinCodeError.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                joinCodeError.classList.add('hidden');
+                const q = query(roomsMetadataCollectionRef, where('roomCode', '==', code));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    joinCodeError.textContent = "Invalid room code or room not found.";
+                    joinCodeError.classList.remove('hidden');
+                    return;
+                }
+
+                const roomDoc = querySnapshot.docs[0];
+                const roomId = roomDoc.id;
+                const roomData = roomDoc.data();
+                const roomName = roomData.name;
+
+                if (roomData.password && roomData.password !== password) {
+                    joinCodeError.textContent = "Incorrect password.";
+                    joinCodeError.classList.remove('hidden');
+                    return;
+                }
+
+                await attemptJoinRoom(roomId, roomName, password, true);
+                hideModal(joinByCodeModal);
+                roomCodeInput.value = '';
+                roomCodePasswordInput.value = '';
+
+            } catch (e) {
+                console.error("Error joining by code:", e);
+                joinCodeError.textContent = `Failed to join room: ${e.message}`;
+                joinCodeError.classList.remove('hidden');
+            }
+        });
+
+        /**
+         * Centralized function to handle joining a room, including ban checks.
+         * @param {string} roomId
+         * @param {string} roomName
+         * @param {string} enteredPassword
+         * @param {boolean} isJoinByCode - True if joining via room code, false otherwise.
+         */
+        async function attemptJoinRoom(roomId, roomName, enteredPassword, isJoinByCode = false) {
+            try {
+                // First, check if the user is banned from this room
+                const bannedUserDocRef = doc(db, `artifacts/${appId}/public/data/rooms_metadata/${roomId}/banned_users`, currentUserId);
+                const bannedDocSnap = await getDoc(bannedUserDocRef);
+
+                if (bannedDocSnap.exists()) {
+                    messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">You are banned from this room.</div><div class="message-info">System Message</div></div>`);
+                    messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                    if (!isJoinByCode) {
+                         setTimeout(() => switchChatroom('global', 'global'), 2000);
+                    }
+                    hideModal(roomBrowserModal);
+                    return;
+                }
+
+                if (!joinedRooms.has(roomId)) {
+                    addRoomButtonToSelection(roomId, roomName);
+                    joinedRooms.set(roomId, roomName);
+                }
+                hideModal(roomBrowserModal);
+                switchChatroom(roomId, roomName);
+
+            } catch (e) {
+                console.error("Error in attemptJoinRoom:", e);
+                const errorMsg = `Failed to join room: ${e.message}. Check your internet connection or try again.`;
+                if (isJoinByCode) {
+                    joinCodeError.textContent = errorMsg;
+                    joinCodeError.classList.remove('hidden');
+                } else {
+                    joinRoomError.textContent = errorMsg;
+                    joinRoomError.classList.remove('hidden');
+                }
+            }
+        }
+
+
+        // --- Message Display and Sending ---
+
+        /**
+         * Fetches a username from cache or Firestore.
+         * @param {string} uid - The user ID.
+         * @returns {Promise<string>} - The username or a truncated UID if not found.
+         */
+        async function getDisplayName(uid) {
+            if (cachedUsernames.has(uid)) {
+                return cachedUsernames.get(uid);
+            }
+            if (uid === currentUserId) {
+                return currentUserName;
+            }
+
+            try {
+                const userDocRef = doc(userProfilesCollectionRef, uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists() && userDocSnap.data().username) {
+                    const fetchedUsername = userDocSnap.data().username;
+                    cachedUsernames.set(uid, fetchedUsername);
+                    return fetchedUsername;
+                }
+            } catch (e) {
+                console.warn("Error fetching username for " + uid + ":", e);
+            }
+            return uid.substring(0, 8) + "...";
+        }
+
+
+        async function appendMessage(messageData) {
+            if (kickedUsersInCurrentRoom.has(messageData.senderId) || bannedUsersInCurrentRoom.has(messageData.senderId)) {
+                console.log(`AppendMessage: Message from kicked or banned user ${messageData.senderId} ignored.`);
+                return;
+            }
+
+            // --- Auto-delete (display filter) ---
+            const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+            const messageTimestamp = messageData.timestamp ? messageData.timestamp.toDate().getTime() : Date.now();
+
+            if (messageTimestamp < fortyEightHoursAgo) {
+                console.log(`Message from ${messageData.senderId} is older than 48 hours, not appending.`);
+                return; // Do not append messages older than 48 hours
+            }
+
+            const isSentByCurrentUser = (messageData.senderId === currentUserId);
+            const displayName = await getDisplayName(messageData.senderId);
+
+            const messageBubble = document.createElement('div');
+            messageBubble.classList.add('message-bubble');
+
+            const messageContentWrapper = document.createElement('div');
+            messageContentWrapper.classList.add('message-content-wrapper');
+
+            if (messageData.imageUrl) {
+                const img = document.createElement('img');
+                img.src = messageData.imageUrl;
+                img.alt = messageData.text || 'Uploaded image';
+                img.classList.add('chat-image');
+                img.onerror = () => {
+                    messageContentWrapper.textContent = `[Image failed to load: ${messageData.imageUrl}] ${applyFilter(messageData.text || '')}`;
+                    console.error("Image failed to load:", messageData.imageUrl);
+                };
+                messageContentWrapper.appendChild(img);
+                if (messageData.text) {
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = applyFilter(messageData.text);
+                    messageContentWrapper.appendChild(document.createElement('br'));
+                    messageContentWrapper.appendChild(textSpan);
+                }
+            } else {
+                // This regex attempts to find direct image links.
+                // It will NOT work for redirect URLs (like google.com/url?...)
+                // or links to web pages that contain an image.
+                const urlRegex = /(https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp|svg|bmp)(\?\S*)?)/gi;
+                if (messageData.text && urlRegex.test(messageData.text)) {
+                    const parts = messageData.text.split(urlRegex);
+                    parts.forEach(part => {
+                        if (urlRegex.test(part)) {
+                            const img = document.createElement('img');
+                            img.src = part;
+                            img.alt = 'Embedded image';
+                            img.classList.add('chat-image');
+                            img.onerror = () => {
+                                const textNode = document.createTextNode(`[Image failed to load from URL: ${part}]`);
+                                messageContentWrapper.appendChild(textNode);
+                                console.error("Image from URL failed to load:", part);
+                            };
+                            messageContentWrapper.appendChild(img);
+                        } else {
+                            const textNode = document.createTextNode(applyFilter(part));
+                            messageContentWrapper.appendChild(textNode);
+                        }
+                    });
+                } else {
+                    messageContentWrapper.textContent = applyFilter(messageData.text);
+                }
+            }
+
+
+            if (isSentByCurrentUser) {
+                messageBubble.classList.add('sent');
+            }
+
+            const messageInfo = document.createElement('div');
+            const date = new Date(messageData.timestamp ? messageData.timestamp.toDate().getTime() : Date.now());
+            const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            messageInfo.textContent = `${displayName} ${timeString}`;
+            messageInfo.classList.add('message-info');
+
+            // Add kick/ban buttons for host
+            if (currentRoomCreatorId === currentUserId && messageData.senderId !== currentUserId) {
+                const kickButton = document.createElement('button');
+                kickButton.classList.add('kick-button');
+                kickButton.textContent = 'Kick';
+                kickButton.title = `Kick ${displayName} from this room`;
+                kickButton.addEventListener('click', () => {
+                    kickUser(messageData.senderId, displayName);
+                });
+                messageInfo.appendChild(kickButton);
+
+                const banButton = document.createElement('button');
+                banButton.classList.add('ban-button');
+                banButton.textContent = 'Ban';
+                banButton.title = `Permanently ban ${displayName} from this room`;
+                banButton.addEventListener('click', () => {
+                    banUser(messageData.senderId, displayName);
+                });
+                messageInfo.appendChild(banButton);
+            }
+
+
+            messageBubble.appendChild(messageInfo);
+            messageBubble.appendChild(messageContentWrapper);
+
+            messagesDisplay.appendChild(messageBubble);
+
+            messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+        }
+
+        function listenForMessages(roomId) {
+            if (!currentUserId || auth.currentUser.isAnonymous === undefined) {
+                 console.log("listenForMessages: Authentication not ready, deferring message listener setup.");
+                 return;
+            }
+
+            const messagesCollectionRef = collection(db, `artifacts/${appId}/public/data/chatrooms/${roomId}/messages`);
+            const q = query(messagesCollectionRef, orderBy('timestamp'));
+
+            unsubscribeFromMessages = onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === "added") {
+                        const messageData = change.doc.data();
+                        await appendMessage(messageData);
+                        if (db) {
+                            try {
+                                const roomDocRef = doc(roomsMetadataCollectionRef, roomId);
+                                await setDoc(roomDocRef, {
+                                    lastActivity: serverTimestamp()
+                                }, { merge: true });
+                            } catch (error) {
+                                console.error("Error updating room lastActivity:", error);
+                            }
+                        }
+                    }
+                });
+            }, (error) => {
+                console.error("listenForMessages: Error listening to messages:", error);
+            });
+            console.log("listenForMessages: Message listener set up for room:", roomId);
+        }
+
+        imageUploadButton.addEventListener('click', () => {
+            imageFileInput.click();
+        });
+
+        imageFileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            if (!file.type.startsWith('image/')) {
+                console.warn("Only image files are allowed.");
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">Only image files can be uploaded.</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                imageFileInput.value = '';
+                return;
+            }
+
+            const MAX_FILE_SIZE_MB = 15; // Changed from 5 to 15
+            if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+                console.warn(`File size exceeds ${MAX_FILE_SIZE_MB}MB limit.`);
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">Image file too large (max ${MAX_FILE_SIZE_MB}MB).</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                imageFileInput.value = '';
+                return;
+            }
+
+            isUploadingImage = true;
+            sendButton.disabled = true;
+            messageInput.placeholder = "Uploading image...";
+
+            try {
+                const filePath = `chat_images/${currentRoomId}/${currentUserId}_${Date.now()}_${file.name}`;
+                const imageRef = ref(storage, filePath);
+                console.log("Uploading image to:", filePath);
+                const snapshot = await uploadBytes(imageRef, file);
+                const imageUrl = await getDownloadURL(snapshot.ref);
+                console.log("Image uploaded, URL:", imageUrl);
+
+                await sendMessage(imageUrl, messageInput.value.trim());
+
+            } catch (e) {
+                console.error("Error uploading image:", e);
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">Image upload failed: ${e.message}</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+            } finally {
+                isUploadingImage = false;
+                sendButton.disabled = false;
+                messageInput.placeholder = `Message /${currentRoomDisplayName}`;
+                imageFileInput.value = '';
+            }
+        });
+
+        async function sendMessage(imageUrl = null, messageText = '') {
+            messageText = messageInput.value.trim();
+
+            if (!messageText && !imageUrl) {
+                console.log("sendMessage: Empty message or no image, not sending.");
+                return;
+            }
+            if (isUploadingImage) {
+                console.warn("sendMessage: Image is still uploading, please wait.");
+                return;
+            }
+
+            // --- Spam Filter: Rate Limit Check ---
+            const now = Date.now();
+            const userId = currentUserId;
+
+            let timestamps = userMessageTimestamps.get(userId) || [];
+            // Remove timestamps older than RATE_LIMIT_SECONDS
+            timestamps = timestamps.filter(ts => now - ts < (RATE_LIMIT_SECONDS * 1000));
+            timestamps.push(now);
+            userMessageTimestamps.set(userId, timestamps);
+
+            if (timestamps.length > MAX_MESSAGES_PER_RATE_WINDOW) {
+                console.warn("sendMessage: Rate limit exceeded for user:", userId);
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">Please slow down. You are sending messages too quickly.</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                messageInput.value = '';
+                return;
+            }
+
+            // --- Spam Filter: Repetitive Message Check ---
+            const normalizedMessage = messageText.toLowerCase().trim();
+            let contentHistory = userMessageContentHistory.get(userId) || [];
+
+            // Filter out old entries and add current message
+            contentHistory = contentHistory.filter(entry => now - entry.timestamp < (SPAM_THRESHOLD_SECONDS * 1000));
+            // Only add text messages to content history for repetition check, not image messages
+            if (!imageUrl) {
+                contentHistory.push({ text: normalizedMessage, timestamp: now });
+            }
+            userMessageContentHistory.set(userId, contentHistory);
+
+            const identicalMessages = contentHistory.filter(entry => entry.text === normalizedMessage);
+
+            if (identicalMessages.length >= SPAM_MESSAGE_COUNT_THRESHOLD) {
+                console.warn("sendMessage: Repetitive message spam detected for user:", userId);
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">Please avoid sending repetitive messages.</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                messageInput.value = '';
+                return;
+            }
+
+            // Check if current user is banned from this room (Firestore rule also enforces this)
+            if (bannedUsersInCurrentRoom.has(currentUserId)) {
+                console.warn("sendMessage: You are banned from this room and cannot send messages.");
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">You are banned from this room and cannot send messages.</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                messageInput.value = '';
+                return;
+            }
+
+            if (currentUserId && db) {
+                try {
+                    const filteredMessage = applyFilter(messageText); // Apply slur filter
+                    const messagesCollectionRef = collection(db, `artifacts/${appId}/public/data/chatrooms/${currentRoomId}/messages`);
+                    
+                    const messagePayload = {
+                        senderId: currentUserId,
+                        timestamp: serverTimestamp(),
+                        text: filteredMessage
+                    };
+
+                    if (imageUrl) {
+                        messagePayload.imageUrl = imageUrl;
+                        messagePayload.text = messageText || ""; // Keep text if exists, or set to empty string
+                    }
+
+                    await addDoc(messagesCollectionRef, messagePayload);
+                    messageInput.value = '';
+                    console.log("sendMessage: Message sent successfully.");
+                } catch (e) {
+                    console.error("sendMessage: Error adding document: ", e);
+                    messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">Failed to send message: ${e.message}</div><div class="message-info">System Message</div></div>`);
+                    messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                }
+            } else {
+                console.warn("sendMessage: Not authenticated or Firestore not initialized. currentUserId:", currentUserId, "db:", !!db);
+                let errorMessage = "Could not send message. Please ensure you are logged in.";
+                if (!currentUserId) errorMessage = "You are not logged in. Please wait for authentication.";
+                if (!db) errorMessage = "Chat service is not ready.";
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">${errorMessage}</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+            }
+        }
+
+        sendButton.addEventListener('click', () => sendMessage());
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // --- Host Control Functions ---
+
+        // Toggle moderation menu
+        moderationMenuButton.addEventListener('click', (event) => {
+            moderationMenu.classList.toggle('hidden');
+            event.stopPropagation();
+        });
+
+        // Close moderation menu if clicked outside
+        document.addEventListener('click', (event) => {
+            if (!moderationMenu.contains(event.target) && !moderationMenuButton.contains(event.target)) {
+                moderationMenu.classList.add('hidden');
+            }
+        });
+
+        /**
+         * Listens for real-time changes in the kicked_users subcollection.
+         * @param {string} roomId - The ID of the room to listen to.
+         */
+        function listenForKickedUsers(roomId) {
+            if (['global', 'general', 'random', 'tech'].includes(roomId)) {
+                if (unsubscribeFromKickedUsers) { unsubscribeFromKickedUsers(); }
+                kickedUsersInCurrentRoom.clear();
+                return;
+            }
+
+            const kickedUsersCollectionRef = collection(db, `artifacts/${appId}/public/data/rooms_metadata/${roomId}/kicked_users`);
+            const q = query(kickedUsersCollectionRef);
+
+            unsubscribeFromKickedUsers = onSnapshot(q, (snapshot) => {
+                kickedUsersInCurrentRoom.clear();
+                snapshot.forEach(doc => {
+                    kickedUsersInCurrentRoom.add(doc.id);
+                });
+                console.log("listenForKickedUsers: Kicked users updated:", Array.from(kickedUsersInCurrentRoom));
+
+                if (kickedUsersInCurrentRoom.has(currentUserId)) {
+                    console.log("listenForKickedUsers: Current user detected as kicked, switching rooms.");
+                    messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">You have been kicked from this room by the host. Switching to /global.</div><div class="message-info">System Message</div></div>`);
+                    messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                    setTimeout(() => {
+                        switchChatroom('global', 'global');
+                    }, 2000);
+                }
+            }, (error) => {
+                console.error("listenForKickedUsers: Error listening to kicked users:", error);
+            });
+            console.log("listenForKickedUsers: Kicked users listener set up for room:", roomId);
+        }
+
+        /**
+         * Listens for real-time changes in the banned_users subcollection.
+         * @param {string} roomId - The ID of the room to listen to.
+         */
+        function listenForBannedUsers(roomId) {
+            if (['global', 'general', 'random', 'tech'].includes(roomId)) {
+                if (unsubscribeFromBannedUsers) { unsubscribeFromBannedUsers(); }
+                bannedUsersInCurrentRoom.clear();
+                return;
+            }
+
+            const bannedUsersCollectionRef = collection(db, `artifacts/${appId}/public/data/rooms_metadata/${roomId}/banned_users`);
+            const q = query(bannedUsersCollectionRef);
+
+            unsubscribeFromBannedUsers = onSnapshot(q, (snapshot) => {
+                bannedUsersInCurrentRoom.clear();
+                snapshot.forEach(doc => {
+                    bannedUsersInCurrentRoom.add(doc.id);
+                });
+                console.log("listenForBannedUsers: Banned users updated:", Array.from(bannedUsersInCurrentRoom));
+
+                if (bannedUsersInCurrentRoom.has(currentUserId)) {
+                    console.log("listenForBannedUsers: Current user detected as banned, switching rooms.");
+                    messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">You have been banned from this room by the host. Switching to /global.</div><div class="message-info">System Message</div></div>`);
+                    messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                    setTimeout(() => {
+                        switchChatroom('global', 'global');
+                    }, 2000);
+                }
+            }, (error) => {
+                console.error("listenForBannedUsers: Error listening to banned users:", error);
+            });
+            console.log("listenForBannedUsers: Banned users listener set up for room:", roomId);
+        }
+
+        /**
+         * Kicks a user from the current room (temporary).
+         * @param {string} userIdToKick - The ID of the user to kick.
+         * @param {string} userNameToKick - The display name of the user to kick.
+         */
+        async function kickUser(userIdToKick, userNameToKick) {
+            if (currentRoomCreatorId !== currentUserId) {
+                console.warn("kickUser: Only the room creator can kick users.");
+                return;
+            }
+            if (userIdToKick === currentUserId) {
+                console.warn("kickUser: You cannot kick yourself.");
+                return;
+            }
+
+            try {
+                const kickedUserDocRef = doc(db, `artifacts/${appId}/public/data/rooms_metadata/${currentRoomId}/kicked_users`, userIdToKick);
+                await setDoc(kickedUserDocRef, { kickedAt: serverTimestamp() });
+                console.log(`kickUser: User ${userNameToKick} (${userIdToKick}) kicked from room ${currentRoomDisplayName}.`);
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-danger-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">${userNameToKick} has been kicked by the host.</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+
+            } catch (e) {
+                console.error("kickUser: Error kicking user:", e);
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">Failed to kick user ${userNameToKick}: ${e.message}</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+            }
+        }
+
+        /**
+         * Bans a user from the current room (permanent).
+         * @param {string} userIdToBan - The ID of the user to ban.
+         * @param {string} userNameToBan - The display name of the user to ban.
+         */
+        async function banUser(userIdToBan, userNameToBan) {
+            if (currentRoomCreatorId !== currentUserId) {
+                console.warn("banUser: Only the room creator can ban users.");
+                return;
+            }
+            if (userIdToBan === currentUserId) {
+                console.warn("banUser: You cannot ban yourself.");
+                return;
+            }
+
+            try {
+                const bannedUserDocRef = doc(db, `artifacts/${appId}/public/data/rooms_metadata/${currentRoomId}/banned_users`, userIdToBan);
+                await setDoc(bannedUserDocRef, { bannedAt: serverTimestamp(), username: userNameToBan });
+                console.log(`banUser: User ${userNameToBan} (${userIdToBan}) banned from room ${currentRoomDisplayName}.`);
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-danger-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">${userNameToBan} has been permanently banned by the host.</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+
+                const kickedUserDocRef = doc(db, `artifacts/${appId}/public/data/rooms_metadata/${currentRoomId}/kicked_users`, userIdToBan);
+                await setDoc(kickedUserDocRef, { kickedAt: serverTimestamp() });
+
+            } catch (e) {
+                console.error("banUser: Error banning user:", e);
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">Failed to ban user ${userNameToBan}: ${e.message}</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+            }
+        }
+
+        // --- Unban Users Logic ---
+        unbanUsersButton.addEventListener('click', async () => {
+            console.log("Unban Users button clicked.");
+            hideModal(moderationMenu);
+            unbanRoomNameSpan.textContent = currentRoomDisplayName;
+            bannedUsersListDiv.innerHTML = '<p class="text-center text-gray-400">Loading banned users...</p>';
+            unbanError.classList.add('hidden');
+            showModal(unbanUsersModal);
+
+            try {
+                const bannedUsersCollectionRef = collection(db, `artifacts/${appId}/public/data/rooms_metadata/${currentRoomId}/banned_users`);
+                const querySnapshot = await getDocs(query(bannedUsersCollectionRef));
+                
+                bannedUsersListDiv.innerHTML = '';
+                if (querySnapshot.empty) {
+                    bannedUsersListDiv.innerHTML = '<p class="text-center text-gray-400">No users currently banned in this room.</p>';
+                    return;
+                }
+
+                querySnapshot.forEach(doc => {
+                    const bannedUser = doc.data();
+                    const userId = doc.id;
+                    const userName = bannedUser.username || (userId.substring(0, 8) + '...');
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `unban-${userId}`;
+                    checkbox.dataset.userId = userId;
+                    checkbox.classList.add('mr-2');
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = `unban-${userId}`;
+                    label.textContent = userName;
+                    label.classList.add('text-white', 'text-sm', 'flex', 'items-center', 'py-1');
+                    
+                    label.prepend(checkbox);
+                    bannedUsersListDiv.appendChild(label);
+                });
+            } catch (e) {
+                console.error("Error loading banned users for unban modal:", e);
+                unbanError.textContent = `Failed to load banned users: ${e.message}`;
+                unbanError.classList.remove('hidden');
+            }
+        });
+
+        cancelUnbanButton.addEventListener('click', () => {
+            console.log("Unban cancelled.");
+            hideModal(unbanUsersModal);
+        });
+
+        confirmUnbanSelectedButton.addEventListener('click', async () => {
+            console.log("Confirm Unban Selected clicked.");
+            const selectedUsers = Array.from(bannedUsersListDiv.querySelectorAll('input[type="checkbox"]:checked'))
+                                    .map(checkbox => checkbox.dataset.userId);
+
+            if (selectedUsers.length === 0) {
+                unbanError.textContent = "No users selected to unban.";
+                unbanError.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                unbanError.classList.add('hidden');
+                for (const userId of selectedUsers) {
+                    const bannedUserDocRef = doc(db, `artifacts/${appId}/public/data/rooms_metadata/${currentRoomId}/banned_users`, userId);
+                    await deleteDoc(bannedUserDocRef);
+                    console.log(`User ${userId} unbanned from room ${currentRoomDisplayName}.`);
+                }
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-accent-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">${selectedUsers.length} user(s) unbanned.</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                hideModal(unbanUsersModal);
+            } catch (e) {
+                console.error("Error unbanning users:", e);
+                unbanError.textContent = `Failed to unban users: ${e.message}`;
+                unbanError.classList.remove('hidden');
+            }
+        });
+
+        // Event listener for the "End Room" button
+        deleteRoomButton.addEventListener('click', () => {
+            console.log("Delete Room button clicked.");
+            showModal(confirmDeleteRoomModal);
+        });
+
+        cancelDeleteRoomButton.addEventListener('click', () => {
+            console.log("Delete Room cancelled.");
+            hideModal(confirmDeleteRoomModal);
+        });
+
+        confirmDeleteRoomButtonAction.addEventListener('click', async () => {
+            console.log("Confirm Delete Room action clicked.");
+            if (currentRoomCreatorId !== currentUserId) {
+                console.warn("confirmDeleteRoomAction: Only the room creator can delete the room.");
+                hideModal(confirmDeleteRoomModal);
+                return;
+            }
+
+            try {
+                const roomDocRef = doc(roomsMetadataCollectionRef, currentRoomId);
+                await deleteDoc(roomDocRef);
+                console.log(`confirmDeleteRoomAction: Room ${currentRoomDisplayName} (${currentRoomId}) deleted.`);
+
+                console.warn("confirmDeleteRoomAction: Note: Subcollections (messages, kicked_users, banned_users) are NOT automatically deleted client-side. A Firebase Cloud Function would be needed for full cleanup.");
+
+                const roomButtonToRemove = document.querySelector(`.chatroom-button[data-room-id="${currentRoomId}"]`);
+                if (roomButtonToRemove) {
+                    roomButtonToRemove.remove();
+                    joinedRooms.delete(currentRoomId);
+                    console.log(`confirmDeleteRoomAction: Room button for ${currentRoomDisplayName} removed.`);
+                }
+
+                hideModal(confirmDeleteRoomModal);
+                switchChatroom('global', 'global');
+            } catch (e) {
+                console.error("confirmDeleteRoomAction: Error deleting room:", e);
+                messagesDisplay.insertAdjacentHTML('beforeend', `<div class="message-bubble"><div class="message-content-wrapper" style="background-color: rgba(var(--color-error-rgb), 0.2); color: rgba(var(--color-text-white-rgb), 0.8);">Failed to delete room: ${e.message}</div><div class="message-info">System Message</div></div>`);
+                messagesDisplay.scrollTop = messagesDisplay.scrollHeight;
+                hideModal(confirmDeleteRoomModal);
+            }
+        });
+    </script>
+</body>
+</html>

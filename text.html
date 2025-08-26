@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Text Editor</title>
+    <!-- Google Fonts - Montserrat -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a modern, minimalist feel with Montserrat font */
+        body {
+            font-family: 'Montserrat', sans-serif; /* Apply Montserrat to the body */
+            @apply bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center min-h-screen p-4;
+            display: flex; /* Ensure flexbox for centering */
+        }
+        .container {
+            @apply bg-white/60 border border-gray-200 shadow-xl rounded-[30px] p-10 w-full max-w-4xl flex flex-col; /* Increased border-radius for very rounded corners */
+            backdrop-filter: blur(25px); /* Stronger blur for glass effect */
+            -webkit-backdrop-filter: blur(25px); /* For Safari compatibility */
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1), 0 6px 15px rgba(0, 0, 0, 0.07); /* Softer, layered shadow */
+            transition: all 0.3s ease; /* Smooth transitions for hover effects */
+            min-height: 85vh; /* Ensure container takes a good portion of viewport height */
+        }
+        .container:hover {
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12), 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+        .toolbar {
+            @apply flex flex-wrap gap-3 mb-6 p-3 bg-gray-50/40 rounded-[20px] justify-center; /* Rounded, more transparent */
+            border: 1px solid rgba(229, 231, 235, 0.5); /* More subtle border for toolbar */
+            backdrop-filter: blur(15px); /* Subtle blur for toolbar */
+            -webkit-backdrop-filter: blur(15px);
+        }
+        .editor-area {
+            @apply flex-grow p-6 border border-gray-300 rounded-[20px] focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 mb-6 text-gray-900 resize-y text-base bg-white; /* Rounded, explicit white background for canvas feel */
+            font-family: 'Montserrat', sans-serif; /* Apply Montserrat to the editor area */
+            line-height: 1.6; /* Improve readability */
+            overflow-y: auto; /* Ensure scrolling if content overflows */
+            min-height: 350px; /* Minimum height to prevent collapse */
+            max-width: 100%; /* Ensure it doesn't overflow horizontally */
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); /* Subtle inner shadow for depth */
+        }
+        .button-group {
+            @apply flex flex-wrap gap-4 justify-center;
+        }
+        .btn {
+            @apply px-7 py-3 rounded-full shadow-sm transition-all duration-200 ease-in-out font-medium text-base; /* Fully rounded buttons */
+            background-color: rgba(255, 255, 255, 0.6); /* Clearer, semi-transparent background for buttons */
+            border: 1px solid rgba(229, 231, 235, 0.7); /* Lighter, clearer border */
+            color: #444; /* Darker text for contrast */
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+        .btn:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px); /* Slight lift on hover */
+        }
+        .btn-primary {
+            @apply bg-blue-500/50 text-blue-800 border-blue-400; /* Clear blue color */
+        }
+        .btn-primary:hover {
+            @apply bg-blue-600/70 border-blue-500 text-white;
+        }
+        .btn-toolbar {
+            @apply px-5 py-2 rounded-full font-semibold text-gray-700 bg-gray-100/50 border border-gray-200/70; /* Fully rounded, clearer toolbar buttons */
+        }
+        .btn-toolbar:hover {
+            @apply bg-gray-200/80 border-gray-300/80;
+        }
+        select {
+            @apply px-5 py-2 rounded-full font-medium text-gray-700 bg-gray-100/50 border border-gray-200/70 focus:outline-none focus:ring-1 focus:ring-blue-400; /* Fully rounded, clearer select */
+        }
+        select:hover {
+            @apply bg-gray-200/80 border-gray-300/80;
+        }
+
+        /* Hidden file input */
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Removed h1 title -->
+
+        <!-- Toolbar for text formatting -->
+        <div class="toolbar">
+            <button id="boldBtn" class="btn-toolbar font-bold">B</button>
+            <button id="italicBtn" class="btn-toolbar italic">I</button>
+            <select id="fontSelect">
+                <option value="Montserrat, sans-serif">Montserrat (Default)</option>
+                <option value="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif">System Sans-serif</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="Verdana, sans-serif">Verdana</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Times New Roman, serif">Times New Roman</option>
+                <option value="Courier New, monospace">Courier New</option>
+                <option value="Roboto, sans-serif">Roboto</option>
+            </select>
+        </div>
+
+        <!-- Content editable div for rich text editing -->
+        <div id="editor" contenteditable="true" class="editor-area" placeholder="Start typing here..."></div>
+
+        <div class="button-group">
+            <!-- Import Button and Hidden File Input -->
+            <input type="file" id="fileInput" accept=".txt,.html,.md">
+            <button id="importBtn" class="btn">Import Text</button>
+
+            <!-- Export Button -->
+            <button id="exportBtn" class="btn">Export Text</button>
+
+            <!-- Clear Button -->
+            <button id="clearBtn" class="btn">Clear Editor</button>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements
+        const editor = document.getElementById('editor');
+        const fileInput = document.getElementById('fileInput');
+        const importBtn = document.getElementById('importBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const boldBtn = document.getElementById('boldBtn');
+        const italicBtn = document.getElementById('italicBtn');
+        const fontSelect = document.getElementById('fontSelect');
+
+        // Set initial placeholder text (since contenteditable doesn't have a native placeholder attribute)
+        editor.addEventListener('focus', () => {
+            if (editor.textContent === 'Start typing here...') {
+                editor.textContent = '';
+                editor.classList.remove('text-gray-400'); // Remove placeholder color
+            }
+        });
+
+        editor.addEventListener('blur', () => {
+            if (editor.textContent.trim() === '') {
+                editor.textContent = 'Start typing here...';
+                editor.classList.add('text-gray-400'); // Add placeholder color
+            }
+        });
+
+        // Initialize with placeholder
+        editor.textContent = 'Start typing here...';
+        editor.classList.add('text-gray-400');
+
+        /**
+         * Event listener for the Bold button.
+         * Toggles bold formatting for selected text or at the insertion point.
+         */
+        boldBtn.addEventListener('click', () => {
+            document.execCommand('bold', false, null);
+            editor.focus(); // Keep focus on the editor
+        });
+
+        /**
+         * Event listener for the Italic button.
+         * Toggles italic formatting for selected text or at the insertion point.
+         */
+        italicBtn.addEventListener('click', () => {
+            document.execCommand('italic', false, null);
+            editor.focus(); // Keep focus on the editor
+        });
+
+        /**
+         * Event listener for the Font selection dropdown.
+         * Changes the font family for selected text or new text.
+         */
+        fontSelect.addEventListener('change', (event) => {
+            const selectedFont = event.target.value;
+            document.execCommand('fontName', false, selectedFont);
+            editor.focus(); // Keep focus on the editor
+        });
+
+        /**
+         * Event listener for the Import button.
+         * Triggers the hidden file input click event.
+         */
+        importBtn.addEventListener('click', () => {
+            fileInput.click(); // Programmatically click the hidden file input
+        });
+
+        /**
+         * Event listener for when a file is selected via the file input.
+         * Reads the content of the selected file and displays it in the editor.
+         * For contenteditable, we set innerHTML instead of value.
+         */
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0]; // Get the first selected file
+
+            if (file) {
+                const reader = new FileReader(); // Create a new FileReader object
+
+                // Set up the onload event handler for the reader
+                reader.onload = (e) => {
+                    editor.innerHTML = e.target.result; // Set the editor's innerHTML to the file content
+                    // Remove placeholder if content is imported
+                    if (editor.textContent.trim() !== '' && editor.textContent !== 'Start typing here...') {
+                        editor.classList.remove('text-gray-400');
+                    }
+                };
+
+                // Read the file content as text
+                reader.readAsText(file);
+            }
+        });
+
+        /**
+         * Event listener for the Export button.
+         * Creates a text file from the editor's content and prompts the user to download it.
+         * For contenteditable, we get innerHTML (or textContent for plain text export).
+         */
+        exportBtn.addEventListener('click', () => {
+            // For plain text export, use textContent; for HTML-rich export, use innerHTML
+            const textContent = editor.innerHTML; // Get the current content (including HTML tags)
+
+            const fileName = 'document.html'; // Default file name for rich text export
+            // If you want plain text without formatting, use: const textContent = editor.textContent; const fileName = 'document.txt';
+
+            // Create a Blob object from the text content with UTF-8 encoding
+            const blob = new Blob([textContent], { type: 'text/html;charset=utf-8' }); // Changed type to text/html
+
+            // Create a temporary URL for the Blob
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName; // Set the download file name
+
+            // Programmatically click the anchor element to initiate the download
+            document.body.appendChild(a); // Append to body is good practice for some browsers
+            a.click();
+
+            // Clean up by revoking the object URL after a short delay
+            document.body.removeChild(a); // Remove the temporary anchor
+            URL.revokeObjectURL(url);
+        });
+
+        /**
+         * Event listener for the Clear button.
+         * Clears all text from the editor div.
+         */
+        clearBtn.addEventListener('click', () => {
+            editor.innerHTML = ''; // Clear the content editable div
+            editor.textContent = 'Start typing here...'; // Reset placeholder
+            editor.classList.add('text-gray-400');
+            editor.focus(); // Optionally focus the editor after clearing
+        });
+    </script>
+</body>
+</html>

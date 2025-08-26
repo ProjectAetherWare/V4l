@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classic Desktop Launcher</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Import the Silkscreen pixelated font */
+        @import url('https://fonts.googleapis.com/css2?family=Silkscreen&display=swap');
+
+        /* Custom styles to mimic Windows 95 look and feel */
+        body {
+            background-color: #008080; /* Windows 95 teal */
+            /* Using Silkscreen font, fallback to 'Inter' and generic sans-serif */
+            font-family: 'Silkscreen', 'Inter', sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            /* Adjusted base font size for better readability with pixel fonts */
+            font-size: 0.68rem; /* Slightly smaller base font size for overall fit */
+        }
+
+        /* Basic 3D button effect for Windows 95 style */
+        .win95-button {
+            border-top: 2px solid #fff;
+            border-left: 2px solid #fff;
+            border-right: 2px solid #555;
+            border-bottom: 2px solid #555;
+            background-color: #c0c0c0;
+            color: #000;
+            font-weight: bold;
+            padding: 0.25rem 0.75rem;
+            text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.5); /* Light shadow for text */
+            cursor: pointer;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3); /* Outer shadow for button */
+            white-space: nowrap; /* Prevent button text from wrapping */
+            font-size: 0.75rem; /* Slightly larger font for buttons, adjusted */
+        }
+
+        .win95-button:active {
+            border-top: 2px solid #555;
+            border-left: 2px solid #555;
+            border-right: 2px solid #fff;
+            border-bottom: 2px solid #fff;
+            box-shadow: none;
+        }
+
+        /* Taskbar styling */
+        .taskbar {
+            background-color: #c0c0c0;
+            border-top: 2px solid #fff; /* Top highlight */
+            border-bottom: 2px solid #000; /* Bottom shadow */
+            z-index: 1000; /* Ensure taskbar is on top */
+            position: relative; /* For stacking context */
+            flex-shrink: 0; /* Prevent taskbar from shrinking */
+        }
+
+        /* Desktop Area using flex for dynamic icon placement */
+        .desktop-area {
+            display: flex;
+            flex-wrap: wrap; /* Allow icons to wrap to the next line */
+            align-content: flex-start; /* Align rows to the start */
+            padding: 1rem;
+            flex-grow: 1; /* Take up remaining vertical space */
+            gap: 0.75rem; /* Gap between icons */
+            overflow-y: auto; /* Allow scrolling if too many icons */
+            align-items: flex-start; /* Align items to the start of the cross axis */
+            position: relative; /* For absolutely positioned windows */
+            z-index: 1; /* Below windows */
+        }
+
+
+        /* Icon styling (for both desktop and start menu where applicable) */
+        .desktop-icon {
+            text-align: center;
+            color: #fff; /* White text for desktop icons */
+            font-size: 0.6rem;
+            line-height: 1.2;
+            cursor: pointer;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+            transition: background-color 0.1s ease-in-out, border 0.1s ease-in-out;
+            padding: 0.6rem 0.3rem;
+            border-radius: 0.25rem;
+            width: 80px; /* Fixed width for icon blocks */
+            text-decoration: none;
+            display: flex; /* Use flex for image/text alignment */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        /* Override desktop icon text color for start menu items */
+        .start-menu-item {
+            color: #000; /* Black text for start menu items */
+            font-size: 0.75rem; /* Larger font for menu items */
+            width: auto; /* Auto width for menu items */
+            flex-direction: row; /* Row direction for icon and text */
+            justify-content: flex-start; /* Align items to the start */
+            padding: 0.3rem 0.5rem; /* Adjusted padding for menu items */
+        }
+        /* Style for recently opened games in taskbar */
+        .recent-game-taskbar-item {
+            background-color: #c0c0c0;
+            border-top: 1px solid #888;
+            border-left: 1px solid #888;
+            border-right: 1px solid #fff;
+            border-bottom: 1px solid #fff;
+            padding: 2px 4px;
+            margin-right: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 120px; /* Limit width of taskbar items */
+            color: #000;
+            font-size: 0.7rem;
+            text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.5);
+            display: flex;
+            align-items: center;
+            border-radius: 0.125rem; /* Small rounding */
+            box-shadow: inset 1px 1px 0px rgba(0,0,0,0.2);
+        }
+        .recent-game-taskbar-item:active {
+            border-top: 1px solid #fff;
+            border-left: 1px solid #fff;
+            border-right: 1px solid #888;
+            border-bottom: 1px solid #888;
+            box-shadow: inset -1px -1px 0px rgba(0,0,0,0.2);
+        }
+        .recent-game-taskbar-item img {
+            width: 16px;
+            height: 16px;
+            margin-right: 4px;
+            image-rendering: pixelated;
+        }
+
+
+        .desktop-icon:hover {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        .desktop-icon img {
+            width: 32px;
+            height: 32px;
+            margin-bottom: 0.25rem;
+            image-rendering: pixelated;
+        }
+
+
+        /* Clock styling */
+        .clock {
+            background-color: #000;
+            color: #fff;
+            padding: 0.25rem 0.5rem;
+            border-top: 1px solid #888;
+            border-left: 1px solid #888;
+            border-right: 1px solid #fff;
+            border-bottom: 1px solid #fff;
+            box-shadow: inset 1px 1px 0px rgba(0, 0, 0, 0.5);
+            min-width: 75px;
+            text-align: center;
+            font-size: 0.6rem;
+            line-height: 1;
+        }
+
+        /* Start Menu specific styles */
+        .start-menu {
+            position: absolute;
+            bottom: calc(100% + 5px);
+            left: 0;
+            background-color: #c0c0c0;
+            border-top: 2px solid #fff;
+            border-left: 2px solid #fff;
+            border-right: 2px solid #000;
+            border-bottom: 2px solid #000;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.3);
+            width: 220px; /* Slightly wider for the list of games */
+            min-height: 250px;
+            max-height: calc(100vh - 70px); /* Limit height to prevent overflow off screen */
+            overflow-y: auto; /* Make start menu scrollable */
+            z-index: 999;
+            display: none;
+            flex-direction: column;
+            font-size: 0.75rem;
+        }
+
+        .start-menu.show {
+            display: flex;
+        }
+
+        .start-menu-item:hover {
+            background-color: #000080; /* Blue hover effect */
+            color: #fff;
+        }
+
+        .start-menu-divider {
+            border-top: 1px dashed #808080;
+            margin: 0.25rem 0.5rem;
+        }
+
+        .start-menu-bottom-pane {
+            background: linear-gradient(to right, #000080, #000080);
+            color: #fff;
+            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            flex-shrink: 0;
+            margin-top: auto;
+        }
+        .start-menu-bottom-pane img {
+            width: 32px;
+            height: 32px;
+            margin-right: 0.5rem;
+            image-rendering: pixelated;
+        }
+
+        /* --- Game Window Styles --- */
+        .game-window {
+            position: absolute;
+            background-color: #c0c0c0;
+            border: 2px solid;
+            border-color: #fff #000 #000 #fff; /* Inset border for window frame */
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.3);
+            min-width: 200px;
+            min-height: 150px;
+            resize: both; /* Enable native resizing for testing */
+            overflow: hidden; /* Hide scrollbars of the window itself */
+            display: flex;
+            flex-direction: column;
+            z-index: 10; /* Default z-index for windows */
+        }
+
+        .window-title-bar {
+            background: linear-gradient(to right, #000080, #1084d0); /* XP-like blue gradient for title bar */
+            color: #fff;
+            padding: 2px 4px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: grab; /* Indicates draggable */
+            flex-shrink: 0; /* Prevent title bar from shrinking */
+            border-bottom: 1px solid #333;
+            text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.5);
+        }
+
+        .window-title-bar-text {
+            flex-grow: 1;
+            text-align: left;
+            margin-left: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .window-controls {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .window-control-button {
+            width: 18px;
+            height: 18px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background-color: #c0c0c0;
+            border-top: 1px solid #fff;
+            border-left: 1px solid #fff;
+            border-right: 1px solid #555;
+            border-bottom: 1px solid #555;
+            color: #000;
+            font-weight: bold;
+            line-height: 1;
+            box-shadow: 1px 1px 0px rgba(0,0,0,0.2);
+        }
+
+        .window-control-button:active {
+            border-top: 1px solid #555;
+            border-left: 1px solid #555;
+            border-right: 1px solid #fff;
+            border-bottom: 1px solid #fff;
+            box-shadow: none;
+        }
+
+        .window-content {
+            flex-grow: 1;
+            background-color: #fff; /* White content area */
+            border-top: 1px solid #888;
+            border-left: 1px solid #888;
+            border-right: 1px solid #fff;
+            border-bottom: 1px solid #fff;
+            overflow: hidden; /* Hide iframe scrollbars if content manages its own */
+            display: flex;
+        }
+
+        .game-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* --- Windows 95 Error Dialog Styles --- */
+        .win95-dialog {
+            background-color: #c0c0c0;
+            border: 2px solid;
+            border-color: #fff #000 #000 #fff; /* Classic 3D border */
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.3);
+            width: 320px; /* Adjusted width to match image more closely */
+            position: absolute; /* Make it positioned for dragging */
+            z-index: 3000; /* On top of everything */
+            display: flex;
+            flex-direction: column;
+            /* No transform here, handled by JS positioning */
+        }
+
+        .win95-dialog .title-bar {
+            background-color: #000080; /* Solid blue, no gradient for classic Win95 dialogs */
+            color: #fff;
+            padding: 2px 4px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            cursor: grab; /* Indicates draggable */
+        }
+
+        .win95-dialog .title-bar-text {
+            margin-left: 4px; /* More margin to match image */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .win95-dialog .close-button {
+            width: 18px;
+            height: 18px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background-color: #c0c0c0;
+            border-top: 1px solid #fff;
+            border-left: 1px solid #fff;
+            border-right: 1px solid #555;
+            border-bottom: 1px solid #555;
+            color: #000;
+            font-weight: bold;
+            line-height: 1;
+            box-shadow: 1px 1px 0px rgba(0,0,0,0.2); /* Small shadow for buttons */
+        }
+        .win95-dialog .close-button:active {
+            border-top: 1px solid #555;
+            border-left: 1px solid #555;
+            border-right: 1px solid #fff;
+            border-bottom: 1px solid #fff;
+            box-shadow: none;
+        }
+
+        .win95-dialog .dialog-content {
+            padding: 25px 20px 20px 20px; /* Adjusted padding to match image spacing */
+            display: flex;
+            align-items: flex-start; /* Align icon and text to top */
+            justify-content: flex-start;
+            gap: 20px; /* Increased gap between icon and text */
+            color: #000; /* Black text */
+            font-size: 0.75rem; /* Slightly larger font for message */
+        }
+
+        .win95-dialog .dialog-icon {
+            width: 32px; /* Adjusted icon size to match image */
+            height: 32px;
+            flex-shrink: 0;
+            image-rendering: pixelated;
+        }
+
+        .win95-dialog .dialog-message {
+            flex-grow: 1;
+            text-align: left; /* Ensure text aligns left */
+            margin-top: 4px; /* Slight offset for text to align with icon top */
+        }
+
+        .win95-dialog .dialog-buttons {
+            display: flex;
+            justify-content: center;
+            padding-bottom: 15px; /* Padding below button */
+        }
+
+        .win95-dialog .dialog-ok-button {
+            border-top: 2px solid #fff;
+            border-left: 2px solid #fff;
+            border-right: 2px solid #555;
+            border-bottom: 2px solid #555;
+            background-color: #c0c0c0;
+            color: #000;
+            font-weight: bold;
+            padding: 0.3rem 1.5rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+            text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.5); /* Match the image */
+            min-width: 80px; /* Ensure button is wide enough */
+        }
+        .win95-dialog .dialog-ok-button:active {
+            border-top: 2px solid #555;
+            border-left: 2px solid #555;
+            border-right: 2px solid #fff;
+            border-bottom: 2px solid #fff;
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+    <!-- Desktop Area -->
+    <div id="desktopArea" class="desktop-area">
+        <!-- Default Desktop Icons -->
+        <a href="#" class="desktop-icon">
+            <img src="https://placehold.co/32x32/c0c0c0/000?text=PC" alt="My Computer" onerror="this.src='https://placehold.co/32x32/c0c0c0/000?text=PC'">
+            My Computer
+        </a>
+        <a href="#" class="desktop-icon">
+            <img src="https://placehold.co/32x32/c0c0c0/000?text=Net" alt="Network Neighborhood" onerror="this.src='https://placehold.co/32x32/c0c0c0/000?text=Net'">
+            Network<br>Neighborhood
+        </a>
+        <a href="#" class="desktop-icon">
+            <img src="https://placehold.co/32x32/c0c0c0/000?text=Mail" alt="Inbox" onerror="this.src='https://placehold.co/32x32/c0c0c0/000?text=Mail'">
+            Inbox
+        </a>
+        <a href="#" class="desktop-icon">
+            <img src="https://placehold.co/32x32/c0c0c0/000?text=Bin" alt="Recycle Bin" onerror="this.src='https://placehold.co/32x32/c0c0c0/000?text=Bin'">
+            Recycle Bin
+        </a>
+        <a href="#" class="desktop-icon">
+            <img src="https://placehold.co/32x32/c0c0c0/000?text=Case" alt="My Briefcase" onerror="this.src='https://placehold.co/32x32/c0c0c0/000?text=Case'">
+            My Briefcase
+        </a>
+        <a href="#" class="desktop-icon">
+            <img src="https://placehold.co/32x32/c0c0c0/000?text=MSN" alt="MSN" onerror="this.src='https://placehold.co/32x32/c0c0c0/000?text=MSN'">
+            MSN
+        </a>
+        <a href="#" class="desktop-icon">
+            <img src="https://placehold.co/32x32/c0c0c0/000?text=Setup" alt="Set Up The Microsoft Network" onerror="this.src='https://placehold.co/32x32/c0c0c0/000?text=Setup'">
+            Set Up The<br>Microsoft<br>Network
+        </a>
+
+        <!-- Spam Errors Button (updated) -->
+        <a href="#" id="spamErrorsButton" class="desktop-icon">
+            <img src="https://placehold.co/32x32/800000/FFFFFF?text=ERR!" alt="Spam Errors" onerror="this.src='https://placehold.co/32x32/800000/FFFFFF?text=ERR!'">
+            <span id="spamButtonText">Spam Errors</span>
+        </a>
+
+        <!-- Random Game Shortcut will be appended here -->
+    </div>
+
+    <!-- Taskbar -->
+    <div class="taskbar flex items-center justify-between p-1 w-full h-10">
+        <!-- Start Button (Container for Start Menu) -->
+        <div class="relative">
+            <button id="startButton" class="win95-button flex items-center px-4 py-1 rounded-sm shadow-md">
+                <img src="https://placehold.co/16x16/000080/FFFFFF?text=W" alt="Start Icon" onerror="this.src='https://placehold.co/16x16/000080/FFFFFF?text=W'" class="mr-1">
+                Start
+            </button>
+
+            <!-- Start Menu -->
+            <div id="startMenu" class="start-menu">
+                <!-- User Profile/Logo Pane -->
+                <div class="start-menu-bottom-pane">
+                    <img src="https://placehold.co/32x32/c0c0c0/000?text=User" alt="User Icon" onerror="this.src='https://placehold.co/32x32/c0c0c0/000?text=User'">
+                    <span id="userName">V4Luser</span>
+                </div>
+                <!-- Standard Menu Items -->
+                <a href="#" class="start-menu-item">
+                    <img src="https://placehold.co/16x16/c0c0c0/000?text=Doc" alt="Documents" onerror="this.src='https://placehold.co/16x16/c0c0c0/000?text=Doc'">
+                    Documents
+                </a>
+                <a href="#" class="start-menu-item">
+                    <img src="https://placehold.co/16x16/c0c0c0/000?text=Set" alt="Settings" onerror="this.src='https://placehold.co/16x16/c0c0c0/000?text=Set'">
+                    Settings
+                </a>
+                <a href="#" class="start-menu-item">
+                    <img src="https://placehold.co/16x16/c0c0c0/000?text=Find" alt="Find" onerror="this.src='https://placehold.co/16x16/c0c0c0/000?text=Find'">
+                    Find
+                </a>
+                <a href="#" class="start-menu-item">
+                    <img src="https://placehold.co/16x16/c0c0c0/000?text=Help" alt="Help" onerror="this.src='https://placehold.co/16x16/c0c0c0/000?text=Help'">
+                    Help
+                </a>
+                <a href="#" class="start-menu-item">
+                    <img src="https://placehold.co/16x16/c0c0c0/000?text=Run" alt="Run..." onerror="this.src='https://placehold.co/16x16/c0c0c0/000?text=Run'">
+                    Run...
+                </a>
+                <div class="start-menu-divider"></div>
+
+                <!-- Games Section Header -->
+                <div class="start-menu-item" style="cursor: default; background-color: #ddd; font-weight: bold; text-shadow: none;">
+                    Games
+                </div>
+                <div id="startMenuGames" class="flex flex-col">
+                    <!-- Game Menu Items will be dynamically loaded here -->
+                </div>
+                <div class="start-menu-divider"></div>
+                <a href="#" class="start-menu-item">
+                    <img src="https://placehold.co/16x16/c0c0c0/000?text=Shut" alt="Shut Down..." onerror="this.src='https://placehold.co/16x16/c0c0c0/000?text=Shut'">
+                    Shut Down...
+                </a>
+            </div>
+        </div>
+
+        <!-- Recent Games in Taskbar -->
+        <div id="recentGamesContainer" class="flex items-center flex-grow h-full mx-2 overflow-x-auto">
+            <!-- Recent game items will be dynamically loaded here -->
+        </div>
+
+        <!-- System Tray / Clock -->
+        <div class="flex items-center space-x-1 pr-1 flex-shrink-0">
+            <!-- Example: Volume icon (using a simple placeholder image for now) -->
+            <img src="https://placehold.co/16x16/c0c0c0/000?text=Vol" alt="Volume" onerror="this.src='https://placehold.co/16x16/c0c0c0/000?text=Vol'" class="w-4 h-4">
+            <div id="currentTime" class="clock text-xs rounded-sm"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global/higher scope variables for dragging
+        let isDragging = false;
+        let currentDraggingWindow = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        // List of game names (cleaned and processed)
+        const gameNames = [
+            "1", "1v1space", "2048", "8ball", "9007199254740992", "BTD4", "Bitlife", "Bloxorz",
+            "Chess", "DogeMiner", "Henrystickman", "HexGL", "L2F2", "L2F3", "Minecraft", "OT",
+            "PE", "SandboxelsOLD", "Subway", "TIOachievementunlocked", "adrenalinechallenge",
+            "among-us", "avalanche", "backrooms", "basketball-stars", "battleforgondor",
+            "bigredbutton", "blackknight", "bloonstd", "bloonstd2", "bloxors", "boxhead2play",
+            "breakingthebank", "btts", "cannon-basketball-4", "canyondefense", "cattle3d",
+            "cell-machine", "championarcher", "chrome-dino", "circlo", "connect3", "cookie-clicker",
+            "craftmine", "creativekillchamber", "csgo-clicker", "ctr", "ctr-holiday", "ctr-tr",
+            "cubefield", "cupcake2048", "deal-or-no-deal", "death-run-3d", "defend-the-tank",
+            "doge2048", "doodle-jump", "doom", "doublewires", "draw-the-hill", "ducklife1",
+            "ducklife2", "ducklife3", "edgenotfound", "elasticman", "endlesswar3", "evil-glitch",
+            "exo", "factoryballs", "fake-virus", "flappy-2048", "flappy-bird", "flashtetris",
+            "game-inside", "geodash", "getaway-shootout", "gimme-the-airpod", "glass-city",
+            "google-snake", "grindcraft", "hackertype", "hba", "helicopter", "hexempire",
+            "hextris", "idle-breakout", "idle-shark", "impossiblequiz", "interactivebuddy",
+            "just-one-boss", "kittencannon", "krunker", "learntofly", "mario", "matrixrampage",
+            "meme2048", "minecraft-classic", "minesweeper", "miniputt", "missiles", "motox3m",
+            "motox3m-pool", "motox3m-spooky", "motox3m-winter", "n-gon", "ns-shaft", "om-bounce",
+            "pandemic2", "papaspizzaria", "paperio2", "papery-planes", "particle-clicker",
+            "polybranch", "portalflash", "push-the-square", "push-your-luck", "retro-bowl", "rh",
+            "rolly-vortex", "rooftop-snipers", "sand-game", "sandboxelsslope", "sm64", "sm64-main",
+            "smashkarts", "smokingbarrels", "snowbattle", "soldier-legend", "solitaire",
+            "sort-the-court", "soundboard", "stack", "stack-bump-3d", "stealingthediamond",
+            "stickwar", "stormthehouse2", "thisistheonlylevel", "superhot", "swerve", "tacticalassasin2", "tank-trouble-2",
+            "tanuki-sunset", "temple-run-2", "the-final-earth", "thebattle", "theheist",
+            "there-is-no-game", "tosstheturtle", "tube-jumpers",
+            "tunnel-rush", "tv-static", "vex3", "vex4", "vex5", "vex6", "webretro", "webretro-localwolf3d",
+            "wordle", "worlds-hardest-game", "you-are-bezos"
+        ];
+
+
+        // Utility function to format game names for display
+        function formatGameNameForDisplay(gameName) {
+            return gameName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        // --- Game Icon Creation with Fallback ---
+        function createGameIconElement(gameName, size = 'desktop') {
+            const img = document.createElement('img');
+            const baseUrl = `projects/${gameName}/`;
+            const defaultPlaceholder = size === 'desktop' ?
+                'https://placehold.co/32x32/008080/FFFFFF?text=Game' :
+                'https://placehold.co/16x16/008080/FFFFFF?text=G';
+
+            img.alt = formatGameNameForDisplay(gameName);
+            img.dataset.gameName = gameName; // Store original game name for reference
+
+            // Initial attempt for .png
+            img.src = `${baseUrl}${gameName}.png`;
+
+            // On error, try .jpg, then fallback to generic placeholder
+            img.onerror = function() {
+                if (!this.dataset.fallbackTriedJpg) {
+                    this.src = `${baseUrl}${gameName}.jpg`;
+                    this.dataset.fallbackTriedJpg = 'true';
+                } else {
+                    this.src = defaultPlaceholder;
+                    this.onerror = null; // Prevent infinite loop if placeholder also fails (unlikely)
+                }
+            };
+            return img;
+        }
+
+        // --- Game Window Management ---
+        const desktopArea = document.getElementById('desktopArea');
+        let zIndexCounter = 20; // Start z-index higher than desktop icons and start menu
+
+        function openGameWindow(gameUrl, gameName) { // Removed isSpamming parameter
+            const existingWindows = document.querySelectorAll(`.game-window[data-game-name="${gameName}"]`);
+            if (existingWindows.length > 0) {
+                bringWindowToFront(existingWindows[0]);
+                return;
+            }
+
+            const formattedGameName = formatGameNameForDisplay(gameName);
+            const gameWindow = document.createElement('div');
+            gameWindow.classList.add('game-window');
+            gameWindow.style.zIndex = zIndexCounter++;
+            gameWindow.dataset.gameName = gameName;
+
+            const desktopRect = desktopArea.getBoundingClientRect();
+            const offsetX = 50 + Math.random() * 100;
+            const offsetY = 50 + Math.random() * 100;
+
+            gameWindow.style.left = `${(desktopRect.width / 4) + offsetX}px`;
+            gameWindow.style.top = `${(desktopRect.height / 4) + offsetY}px`;
+            gameWindow.style.width = '600px';
+            gameWindow.style.height = '450px';
+
+            const titleBar = document.createElement('div');
+            titleBar.classList.add('window-title-bar');
+            titleBar.innerHTML = `
+                <span class="window-title-bar-text">${formattedGameName}</span>
+                <div class="window-controls">
+                    <button class="window-control-button minimize-btn" title="Minimize">—</button>
+                    <button class="window-control-button maximize-btn" title="Launch Fullscreen">□</button>
+                    <button class="window-control-button close-btn" title="Close">×</button>
+                </div>
+            `;
+            gameWindow.appendChild(titleBar);
+
+            const contentArea = document.createElement('div');
+            contentArea.classList.add('window-content');
+            const iframe = document.createElement('iframe');
+            iframe.src = gameUrl;
+            iframe.classList.add('game-iframe');
+            iframe.setAttribute('loading', 'lazy');
+            contentArea.appendChild(iframe);
+            gameWindow.appendChild(contentArea);
+
+            desktopArea.appendChild(gameWindow);
+
+            gameWindow.addEventListener('mousedown', (e) => {
+                if (!e.target.classList.contains('window-title-bar') && !e.target.closest('.window-title-bar')) {
+                    bringWindowToFront(gameWindow);
+                }
+            });
+
+            titleBar.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('window-control-button')) return;
+                isDragging = true;
+                currentDraggingWindow = gameWindow;
+                dragOffsetX = e.clientX - gameWindow.getBoundingClientRect().left;
+                dragOffsetY = e.clientY - gameWindow.getBoundingClientRect().top;
+                gameWindow.style.cursor = 'grabbing';
+                bringWindowToFront(gameWindow);
+                e.preventDefault();
+            });
+
+            titleBar.querySelector('.close-btn').addEventListener('click', () => {
+                gameWindow.remove();
+            });
+
+            titleBar.querySelector('.minimize-btn').addEventListener('click', () => {
+                 gameWindow.remove();
+            });
+
+            titleBar.querySelector('.maximize-btn').addEventListener('click', () => {
+                window.location.href = gameUrl;
+            });
+
+            addGameToRecent(gameName); // Always add to recent if opened
+        }
+
+        function bringWindowToFront(windowElement) {
+            windowElement.style.zIndex = zIndexCounter++;
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || !currentDraggingWindow) return;
+
+            const desktopRect = desktopArea.getBoundingClientRect();
+
+            const newLeft = e.clientX - dragOffsetX;
+            const newTop = e.clientY - dragOffsetY;
+
+            const minLeft = 0;
+            const maxLeft = desktopRect.width - currentDraggingWindow.offsetWidth;
+            const minTop = 0;
+            const maxTop = desktopRect.height - currentDraggingWindow.offsetHeight;
+
+            currentDraggingWindow.style.left = `${Math.min(Math.max(newLeft, minLeft), maxLeft)}px`;
+            currentDraggingWindow.style.top = `${Math.min(Math.max(newTop, minTop), maxTop)}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging && currentDraggingWindow) {
+                currentDraggingWindow.style.cursor = 'grab';
+            }
+            isDragging = false;
+            currentDraggingWindow = null;
+        });
+
+
+        // --- Windows 95 Error Dialog ---
+        function showWindows95ErrorDialog(message) {
+            const dialog = document.createElement('div');
+            dialog.classList.add('win95-dialog');
+            dialog.style.position = 'absolute';
+            dialog.style.zIndex = zIndexCounter++;
+
+            // Random offset for each new error window
+            const desktopRect = desktopArea.getBoundingClientRect();
+            const offsetX = 50 + Math.random() * 100;
+            const offsetY = 50 + Math.random() * 100;
+            dialog.style.left = `${(desktopRect.width / 2) - (dialog.offsetWidth / 2) + offsetX}px`; // Centered then offset
+            dialog.style.top = `${(desktopRect.height / 2) - (dialog.offsetHeight / 2) + offsetY}px`; // Centered then offset
+
+
+            const titleBar = document.createElement('div');
+            titleBar.classList.add('title-bar');
+            titleBar.innerHTML = `
+                <span class="title-bar-text">Windows 95</span>
+                <button class="close-button">×</button>
+            `;
+            dialog.appendChild(titleBar);
+
+            const content = document.createElement('div');
+            content.classList.add('dialog-content');
+            content.innerHTML = `
+                <img src="https://placehold.co/32x32/c0c0c0/000?text=PC" alt="Error Icon" class="dialog-icon" onerror="this.src='https://placehold.co/32x32/c0c0c0/000?text=PC'">
+                <span class="dialog-message">${message}</span>
+            `;
+            dialog.appendChild(content);
+
+            const buttonsContainer = document.createElement('div');
+            buttonsContainer.classList.add('dialog-buttons');
+            const okButton = document.createElement('button');
+            okButton.classList.add('dialog-ok-button');
+            okButton.textContent = 'Ok';
+            buttonsContainer.appendChild(okButton);
+            dialog.appendChild(buttonsContainer);
+
+            desktopArea.appendChild(dialog);
+
+            const closeDialog = () => dialog.remove();
+            titleBar.querySelector('.close-button').addEventListener('click', closeDialog);
+            okButton.addEventListener('click', closeDialog);
+
+            titleBar.style.cursor = 'grab';
+            titleBar.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('close-button')) return;
+                isDragging = true;
+                currentDraggingWindow = dialog;
+                dragOffsetX = e.clientX - dialog.getBoundingClientRect().left;
+                dragOffsetY = e.clientY - dialog.getBoundingClientRect().top;
+                dialog.style.cursor = 'grabbing';
+                bringWindowToFront(dialog);
+                e.preventDefault();
+            });
+
+            dialog.addEventListener('mousedown', (e) => {
+                if (!e.target.classList.contains('title-bar') && !e.target.closest('.title-bar')) {
+                    bringWindowToFront(dialog);
+                }
+            });
+        }
+
+
+        // --- Spam Errors Button Functionality ---
+        let isSpammingErrors = false;
+        let spammingInterval = null;
+        let spammingErrorCounter = 0;
+
+        const spamErrorsButton = document.getElementById('spamErrorsButton');
+        const spamButtonText = document.getElementById('spamButtonText');
+
+        spamErrorsButton.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            if (isSpammingErrors) {
+                clearInterval(spammingInterval);
+                spammingInterval = null;
+                isSpammingErrors = false;
+                spamButtonText.textContent = 'Spam Errors';
+            } else {
+                isSpammingErrors = true;
+                spamButtonText.textContent = 'Stop Spam';
+                spammingInterval = setInterval(() => {
+                    spammingErrorCounter++;
+                    showWindows95ErrorDialog(`This Error is a Test. Nothing to fear. Error #${spammingErrorCounter}`);
+                }, 150); // Opens an error window every 150ms
+            }
+        });
+
+
+        // --- Recent Games in Taskbar ---
+        const MAX_RECENT_GAMES = 5;
+        let recentGames = [];
+
+        function loadRecentGames() {
+            try {
+                const storedRecent = localStorage.getItem('recentGames');
+                if (storedRecent) {
+                    recentGames = JSON.parse(storedRecent);
+                }
+            } catch (e) {
+                console.error("Failed to load recent games from localStorage:", e);
+                recentGames = [];
+            }
+        }
+
+        function saveRecentGames() {
+            try {
+                localStorage.setItem('recentGames', JSON.stringify(recentGames));
+            } catch (e) {
+                console.error("Failed to save recent games to localStorage:", e);
+            }
+        }
+
+        function addGameToRecent(gameName) {
+            const gameUrl = `projects/${gameName}/index.html`;
+            recentGames = recentGames.filter(game => game.name !== gameName);
+            recentGames.unshift({ name: gameName, url: gameUrl });
+            if (recentGames.length > MAX_RECENT_GAMES) {
+                recentGames = recentGames.slice(0, MAX_RECENT_GAMES);
+            }
+            saveRecentGames();
+            updateRecentGamesUI();
+        }
+
+        function updateRecentGamesUI() {
+            const container = document.getElementById('recentGamesContainer');
+            container.innerHTML = '';
+
+            recentGames.forEach(game => {
+                const item = document.createElement('div');
+                item.classList.add('recent-game-taskbar-item');
+                item.title = formatGameNameForDisplay(game.name);
+
+                const img = createGameIconElement(game.name, 'start-menu');
+                item.appendChild(img);
+
+                const textSpan = document.createElement('span');
+                textSpan.textContent = formatGameNameForDisplay(game.name);
+                item.appendChild(textSpan);
+
+                item.addEventListener('click', () => {
+                    openGameWindow(game.url, game.name);
+                });
+                container.appendChild(item);
+            });
+        }
+
+
+        // --- Random Game Desktop Shortcut ---
+        function addRandomGameDesktopShortcut() {
+            if (gameNames.length === 0) return;
+
+            const randomIndex = Math.floor(Math.random() * gameNames.length);
+            const randomGameName = gameNames[randomIndex];
+            const gameUrl = `projects/${randomGameName}/index.html`;
+            const formattedGameName = formatGameNameForDisplay(randomGameName);
+
+            const link = document.createElement('a');
+            link.classList.add('desktop-icon');
+            link.href = "#"; // Handled by JS click
+            link.rel = 'noopener noreferrer';
+
+            const img = createGameIconElement(randomGameName, 'desktop');
+            link.appendChild(img);
+
+            const text = document.createTextNode(formattedGameName);
+            link.appendChild(text);
+
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                openGameWindow(gameUrl, randomGameName);
+            });
+
+            // Append to desktopArea, the flex container will arrange it
+            desktopArea.appendChild(link);
+        }
+
+
+        // JavaScript for the clock functionality
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = now.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
+            const timeString = `${hours}:${formattedMinutes} ${ampm}`;
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        setInterval(updateClock, 1000);
+
+        // --- Initial setup on window load ---
+        window.onload = function() {
+            updateClock();
+            populateStartMenuGames();
+            loadRecentGames();
+            updateRecentGamesUI();
+            addRandomGameDesktopShortcut(); // Add the random game shortcut on load
+        };
+
+        // --- Start Menu Functionality ---
+        const startButton = document.getElementById('startButton');
+        const startMenu = document.getElementById('startMenu');
+
+        startButton.addEventListener('click', (event) => {
+            startMenu.classList.toggle('show');
+            event.stopPropagation();
+        });
+
+        document.addEventListener('click', (event) => {
+            if (startMenu.classList.contains('show') && !startMenu.contains(event.target) && event.target !== startButton) {
+                startMenu.classList.remove('show');
+            }
+        });
+
+        startMenu.addEventListener('click', (event) => {
+            if (event.target.tagName === 'A' || event.target.closest('A')) {
+                startMenu.classList.remove('show');
+            } else {
+                event.stopPropagation();
+            }
+        });
+
+        function populateStartMenuGames() {
+            const startMenuGamesContainer = document.getElementById('startMenuGames');
+            gameNames.forEach(gameName => {
+                const link = document.createElement('a');
+                link.href = "#";
+                link.classList.add('start-menu-item');
+                link.rel = 'noopener noreferrer';
+
+                const img = createGameIconElement(gameName, 'start-menu');
+                link.appendChild(img);
+
+                const text = document.createTextNode(formatGameNameForDisplay(gameName));
+                link.appendChild(text);
+
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openGameWindow(`projects/${gameName}/index.html`, gameName);
+                });
+
+                startMenuGamesContainer.appendChild(link);
+            });
+        }
+    </script>
+</body>
+</html>
